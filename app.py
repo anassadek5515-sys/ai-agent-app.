@@ -1,33 +1,58 @@
 import streamlit as st
 import torch
+import time
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
-# 1. إعدادات الصفحة والواجهة
-st.set_page_config(page_title="Super AI Agent", page_icon="🧠", layout="wide")
-
-st.title("🧠 المساعد الذكي المتكامل - Super AI Agent")
-st.caption("تطبيق ذكاء اصطناعي تفاعلي يعتمد على نموذج Qwen1.5 المطور")
-
-# 2. الشريط الجانبي (Sidebar) للتحكم في الخصائص
-st.sidebar.header("⚙️ إعدادات الـ Agent")
-
-agent_role = st.sidebar.selectbox(
-    "اختر تخصص الـ Agent:",
-    (
-        "محلل مهام وخبرات (Task Planner)",
-        "مساعد برمجة وحلول تقنية (Code Expert)",
-        "محرر ومترجم نصوص احترافي (Writer & Translator)"
-    )
+# 1. إعدادات الصفحة والتصميم العالي
+st.set_page_config(
+    page_title="Gemini-Style AI Assistant",
+    page_icon="✨",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-temperature = st.sidebar.slider("مستوى الإبداع (Temperature):", 0.1, 1.0, 0.3, 0.1)
-max_tokens = st.sidebar.slider("أقصى طول للرد (Max Tokens):", 100, 500, 300, 50)
+# لمسة CSS لتنسيق الواجهة وتقريبها من واجهات الذكاء الاصطناعي الاحترافية
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0e1117;
+    }
+    .stChatMessage {
+        border-radius: 12px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    .stChatInputContainer {
+        padding-bottom: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-if st.sidebar.button("مسح الذاكرة وبدء محادثة جديدة 🧹"):
-    st.session_state.messages = []
-    st.rerun()
+st.title("✨ المساعد الذكي التفاعلي")
+st.caption("تطبيق AI Agent متكامل يدعم المحادثة المستمرة وتفكيك المهام")
 
-# 3. تحميل النموذج وتخزينه في الذاكرة المؤقتة
+# 2. الشريط الجانبي للإعدادات وتخصيص الشخصية
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/bot.png", width=70)
+    st.title("تخصيص الـ Agent")
+    
+    personality = st.radio(
+        "اختر نمط المساعد:",
+        ("✨ متكامل وتفاعلي (Gemini Style)", "💻 خبير تقني وبرمجة", "📋 منظم ومحلل مهام")
+    )
+    
+    st.divider()
+    
+    temperature = st.slider("مستوى المرونة والابتكار:", 0.1, 1.0, 0.4, 0.1)
+    max_tokens = st.slider("أقصى طول للإجابة:", 150, 600, 350, 50)
+    
+    st.divider()
+    
+    if st.button("بدء محادثة جديدة 🔄", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+# 3. تحميل النموذج
 @st.cache_resource
 def load_model():
     model_id = "Qwen/Qwen1.5-0.5B-Chat"
@@ -42,55 +67,65 @@ def load_model():
 
 tokenizer, pipe = load_model()
 
-# 4. تحديد التوجيه الخاص بالنظام بناءً على الخيار
+# 4. توجيه النظام (System Prompts)
 system_prompts = {
-    "محلل مهام وخبرات (Task Planner)": "أنت عميل ذكاء اصطناعي متخصص في تفكيك المشاكل والمهام إلى خطة عمل من خطوات تنفيذية مرتبة. أجب باللغة العربية بوضوح.",
-    "مساعد برمجة وحلول تقنية (Code Expert)": "أنت خبير برمجة وتطوير برمجيات. قم بكتابة الأكواد وتصحيح الأخطاء مع شرح بسيط. أجب باللغة العربية.",
-    "محرر ومترجم نصوص احترافي (Writer & Translator)": "أنت ممارس محترف لكتابة المحتوى والترجمة. قم بإعادة صياغة النصوص أو ترجمتها بأسلوب سلس واحترافي باللغة العربية."
+    "✨ متكامل وتفاعلي (Gemini Style)": "أنت مساعد ذكاء اصطناعي ذكي، متعاون، وبسيط في الشرح. أجب بوضوح ودقة باللغة العربية مع دعم التنسيق المنظم.",
+    "💻 خبير تقني وبرمجة": "أنت مهندس برمجيات وخبير تقني. قدم حلولاً برمجية نظيفة مع شرح الكود والخطوات. أجب باللغة العربية.",
+    "📋 منظم ومحلل مهام": "أنت خبير في إدارة المشاريع والمهام. قم بتفكيك الأهداف الصعبة إلى 3-5 خطوات تنفيذية مباشرة. أجب باللغة العربية."
 }
 
-# 5. إدارة سجل المحادثة (Memory)
+# 5. إدارة سياق وذاكرة المحادثة
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض المحادثات السابقة على الشاشة
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# عرض سياق الحوار السابق
+for msg in st.session_state.messages:
+    avatar = "🧑‍💻" if msg["role"] == "user" else "✨"
+    with st.chat_message(msg["role"], avatar=avatar):
+        st.markdown(msg["content"])
 
-# 6. استقبال مدخلات المستخدم والتفاعل معه
-if prompt := st.chat_input("اكتب سؤالك أو مهمتك هنا..."):
-    # عرض رسالة المستخدم
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+# 6. استقبال المدخلات وتوليد الرد بالبث التفاعلي
+if user_prompt := st.chat_input("اسألني عن أي شيء أو اطلب مهمة..."):
+    # إضافة ورسم رسالة المستخدم
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    with st.chat_message("user", avatar="🧑‍💻"):
+        st.markdown(user_prompt)
 
-    # معالجة الرد من الـ AI
-    with st.chat_message("assistant"):
-        with st.spinner("جاري التفكير وصياغة الرد..."):
-            # بناء سياق الحوار مع الـ System Prompt
-            formatted_messages = [{"role": "system", "content": system_prompts[agent_role]}]
-            for msg in st.session_state.messages:
-                formatted_messages.append({"role": msg["role"], "content": msg["content"]})
+    # معالجة وتوليد الرد
+    with st.chat_message("assistant", avatar="✨"):
+        message_placeholder = st.empty()
+        
+        # إعداد الرسائل وتغذية سياق الحوار الكامل للنموذج
+        formatted_messages = [{"role": "system", "content": system_prompts[personality]}]
+        for m in st.session_state.messages:
+            formatted_messages.append({"role": m["role"], "content": m["content"]})
             
-            formatted_input = tokenizer.apply_chat_template(
-                formatted_messages, 
-                tokenize=False, 
-                add_generation_prompt=True
-            )
-            
+        formatted_input = tokenizer.apply_chat_template(
+            formatted_messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        
+        with st.spinner("جاري صياغة الإجابة..."):
             outputs = pipe(
-                formatted_input, 
-                max_new_tokens=max_tokens, 
-                do_sample=True, 
+                formatted_input,
+                max_new_tokens=max_tokens,
+                do_sample=True,
                 temperature=temperature,
                 repetition_penalty=1.2
             )
             
             full_text = outputs[0]["generated_text"]
             response_text = full_text.split("<|im_start|>assistant\n")[-1].replace("<|im_end|>", "").strip()
-            
-            st.markdown(response_text)
-            
-    # حفظ رد الـ AI في الذاكرة
+
+        # محاكاة تأثير ظهور النص التدريجي (Streaming Effect)
+        displayed_text = ""
+        for chunk in response_text.split(" "):
+            displayed_text += chunk + " "
+            time.sleep(0.03)
+            message_placeholder.markdown(displayed_text + "▌")
+        
+        message_placeholder.markdown(response_text)
+
+    # حفظ الرد في ذاكرة المحادثة
     st.session_state.messages.append({"role": "assistant", "content": response_text})
