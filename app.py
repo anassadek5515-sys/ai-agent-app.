@@ -1,26 +1,63 @@
 import streamlit as st
 import os
-import base64
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 
 # 1. إعدادات الشاشة
 st.set_page_config(page_title="Super AI Agent", page_icon="✨", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS
+# 2. تصميم CSS احترافي بألوان واضحة جداً وبدون كلام باهت
 st.markdown("""
     <style>
     [data-testid="collapsedControl"], [data-testid="stSidebar"], #MainMenu, header, footer { display: none !important; }
-    .stApp { background-color: #131314; color: #e3e3e3; font-family: 'Segoe UI', sans-serif; }
-    html, body, [class*="css"] { direction: rtl; text-align: right; }
+    
+    /* خلفية داكنة مع نصوص بيضاء ناصعة */
+    .stApp { 
+        background-color: #121212 !important; 
+        color: #FFFFFF !important; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    /* ضبط النص والاتجاه لجميع العناصر */
+    p, span, div, h1, h2, h3, h4, label {
+        color: #FFFFFF !important;
+        direction: rtl;
+        text-align: right;
+    }
+
+    /* فقاعة رسالة المستخدم */
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-        background-color: #1e1f20 !important; border-radius: 20px !important; padding: 15px 20px !important; margin: 10px 0 !important;
+        background-color: #242526 !important;
+        border-radius: 18px !important;
+        padding: 12px 18px !important;
+        margin: 8px 0 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #3A3B3C;
     }
+
+    /* فقاعة رسالة الذكاء الاصطناعي */
     [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) {
-        background-color: transparent !important; padding: 15px 10px !important; margin: 10px 0 !important;
+        background-color: transparent !important;
+        padding: 12px 10px !important;
+        margin: 8px 0 !important;
+        color: #FFFFFF !important;
     }
+
+    /* مربع الإدخال الرئيسي */
+    .stChatInputContainer textarea {
+        color: #FFFFFF !important;
+        background-color: #242526 !important;
+    }
+    
     .stChatInputContainer {
-        background-color: #1e1f20 !important; border-radius: 30px !important; border: 1px solid rgba(255,255,255,0.1) !important;
+        background-color: #242526 !important;
+        border-radius: 25px !important;
+        border: 1px solid #4E4F50 !important;
+    }
+    
+    /* نص الـ Placeholder داخل مربع الكتابة */
+    .stChatInputContainer textarea::placeholder {
+        color: #B0B3B8 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -47,10 +84,7 @@ def search_web(query, max_results=3):
     except Exception:
         return ""
 
-st.markdown("<h2 style='text-align: center; color: white;'>✨ مساعدك الذكي الخارق</h2>", unsafe_allow_html=True)
-
-# خيار رفع صورة لتحليلها
-uploaded_image = st.file_uploader("📷 ارفق صورة لتحليلها (اختياري)", type=["jpg", "png", "jpeg"])
+st.markdown("<h2 style='text-align: center; color: #FFFFFF;'>✨ أنس AI</h2>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([4, 1, 4])
 with col2:
@@ -72,7 +106,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-if user_prompt := st.chat_input("اسألني عن أي شيء، كود، أو صورة..."):
+if user_prompt := st.chat_input("اسألني عن أي شيء..."):
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_prompt)
@@ -80,14 +114,12 @@ if user_prompt := st.chat_input("اسألني عن أي شيء، كود، أو �
     with st.chat_message("assistant", avatar="✨"):
         message_placeholder = st.empty()
         
-        with st.spinner("🔍 جاري المعالجة والتفكير..."):
+        with st.spinner("🔍 جاري التفكير والبحث..."):
             search_context = search_web(user_prompt)
             system_instruction = SUPER_SYSTEM_PROMPT
             
             if search_context:
                 system_instruction += f"\n\n--- [نتائج البحث الحي من الإنترنت] ---\n{search_context}"
-            if uploaded_image:
-                system_instruction += f"\n\n--- [ملاحظة: تم إرفاق صورة باسم {uploaded_image.name}] ---"
 
             api_messages = [{"role": "system", "content": system_instruction}]
             for m in st.session_state.messages[:-1]:
