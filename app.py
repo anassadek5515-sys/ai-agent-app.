@@ -6,7 +6,7 @@ from duckduckgo_search import DDGS
 # 1. إعدادات الشاشة
 st.set_page_config(page_title="Super AI Agent", page_icon="✨", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS احترافي متوافق مع الموبايل ومتصفح الـ WebView
+# 2. تصميم CSS محدد لإظهار مربع الكتابة والنص بوضوح تكتيكي
 st.markdown("""
     <style>
     :root {
@@ -27,6 +27,7 @@ st.markdown("""
         text-align: right;
     }
 
+    /* فقاعات الرسائل */
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
         background-color: #242526 !important;
         border-radius: 18px !important;
@@ -43,16 +44,24 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
+    /* إصلاح مربع الإدخال والنص أثناء الكتابة */
+    .stChatInputContainer {
+        background-color: #2A2B2D !important;
+        border-radius: 25px !important;
+        border: 1px solid #5A5B5E !important;
+        padding: 5px !important;
+    }
+
     .stChatInputContainer textarea {
         color: #FFFFFF !important;
-        background-color: #242526 !important;
+        background-color: transparent !important;
         -webkit-text-fill-color: #FFFFFF !important;
+        font-size: 16px !important;
     }
-    
-    .stChatInputContainer {
-        background-color: #242526 !important;
-        border-radius: 25px !important;
-        border: 1px solid #4E4F50 !important;
+
+    .stChatInputContainer textarea::placeholder {
+        color: #AAAAAA !important;
+        -webkit-text-fill-color: #AAAAAA !important;
     }
     </style>
 """, unsafe_allow_html=True)
