@@ -3,7 +3,7 @@ import os
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 
-# 1. إعدادات الصفحة الأساسية (واجهة راقية بدون شريط جانبي)
+# 1. إعدادات الصفحة الأساسية
 st.set_page_config(
     page_title="Super AI Agent",
     page_icon="✨",
@@ -59,15 +59,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. إعداد نموذج الذكاء الاصطناعي
+# 3. إعداد المفتاح
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
 if not HF_TOKEN:
     st.error("⚠️ يرجى إدخال HF_TOKEN في إعدادات Secrets على Streamlit Cloud.")
     st.stop()
 
-MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
+# قائمة النماذج المتاحة مجاناً للتحويل التلقائي عند الضغط على السيرفر
+AVAILABLE_MODELS = [
+    "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "Qwen/Qwen2.5-Coder-7B-Instruct",
+    "mistralai/Mistral-7B-Instruct-v0.3"
+]
 
 # 🌐 دالة البحث السريع في الإنترنت
 def search_web(query, max_results=3):
@@ -77,7 +81,7 @@ def search_web(query, max_results=3):
             for r in ddgs.text(query, max_results=max_results):
                 results.append(f"- المصدر: {r['title']}\n  الملخص: {r['body']}\n  الرابط: {r['href']}")
         return "\n".join(results)
-    except Exception as e:
+    except Exception:
         return ""
 
 # 4. الواجهة الرئيسية
@@ -92,11 +96,11 @@ with col2:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # 5. التوجيهات الخارقة للذكاء الاصطناعي
-SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي خارق ومتقدم، تمتلك الوصول المباشر للإنترنت ولدي المعرفة الكاملة بجميع العلوم.
+SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي خارق ومتقدم، تمتلك الوصول المباشر للإنترنت ولديك المعرفة الكاملة بجميع العلوم.
 قواعد الإجابة:
-1. الفهم والدقة: أجب بدقة وشكل مفصل ومباشر باللغة العربية.
+1. الفهم والدقة: أجب بدقة وبشكل مفصل ومباشر باللغة العربية.
 2. التنظيم: استخدم العناوين والخط العريض (Bold) والنقاط لجعل الإجابة مريحة ومنظمة.
-3. معالجة نتائج البحث: إذا تم تزويدك بـ "نتائج بحث من الإنترنت"، استخدمها لصياغة إجابة محدثة ودقيقة جداً واذكر الأسباب أو الأخبار بوضوح.
+3. معالجة نتائج البحث: إذا تم تزويدك بـ "نتائج بحث من الإنترنت"، استخدمها لصياغة إجابة محدثة ودقيقة جداً.
 4. الثقة: تحدث بثقة واحترافية عالية كأفضل ذكاء اصطناعي في العالم."""
 
 # 6. إدارة سجل المحادثات
@@ -108,7 +112,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-# 7. معالجة إدخال المستخدم والبحث الحي
+# 7. معالجة إدخال المستخدم وتوليد الرد مع التحويل التلقائي بين السيرفرات
 if user_prompt := st.chat_input("اسألني عن أي شيء، أخبار، أو كود..."):
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user", avatar="👤"):
@@ -118,29 +122,38 @@ if user_prompt := st.chat_input("اسألني عن أي شيء، أخبار، أ
         message_placeholder = st.empty()
         
         with st.spinner("🔍 جاري البحث في الإنترنت والتفكير..."):
-            # البحث المباشر في النت في الخلفية
             search_context = search_web(user_prompt)
             
-            #دمج نتائج البحث مع برومبت النظام
             system_instruction = SUPER_SYSTEM_PROMPT
             if search_context:
                 system_instruction += f"\n\n--- [نتائج البحث الحي المباشر من الإنترنت] ---\n{search_context}"
 
             api_messages = [{"role": "system", "content": system_instruction}]
-            
             for m in st.session_state.messages[:-1]:
                 api_messages.append({"role": m["role"], "content": m["content"]})
-            
             api_messages.append({"role": "user", "content": user_prompt})
 
-            try:
-                response = client.chat_completion(
-                    messages=api_messages,
-                    max_tokens=4096,
-                    temperature=0.3,
-                )
-                response_text = response.choices[0].message.content
+            response_text = None
+            last_error = None
+
+            # التجربة التلقائية للنماذج المتاحة
+            for model_id in AVAILABLE_MODELS:
+                try:
+                    client = InferenceClient(model=model_id, token=HF_TOKEN)
+                    response = client.chat_completion(
+                        messages=api_messages,
+                        max_tokens=4096,
+                        temperature=0.3,
+                    )
+                    response_text = response.choices[0].message.content
+                    if response_text:
+                        break
+                except Exception as e:
+                    last_error = e
+                    continue
+
+            if response_text:
                 message_placeholder.markdown(response_text)
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
-            except Exception as e:
-                st.error(f"حدث خطأ أثناء الاتصال: {e}")
+            else:
+                st.error(f"حدث خطأ أثناء الاتصال بالسيرفرات: {last_error}")
