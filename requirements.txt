@@ -1,3 +1,5 @@
 streamlit
 huggingface_hub
-duckduckgo-search
+duckduckgo_search
+pillow
+pypdf
