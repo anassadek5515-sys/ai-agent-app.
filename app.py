@@ -1,131 +1,208 @@
 import streamlit as st
-import torch
-import time
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+import os
+from huggingface_hub import InferenceClient
 
-# 1. إعدادات الصفحة والتصميم العالي
+# 1. إعدادات الصفحة الاحترافية
 st.set_page_config(
-    page_title="Gemini-Style AI Assistant",
-    page_icon="✨",
+    page_title="Super AI Agent Pro",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# لمسة CSS لتنسيق الواجهة وتقريبها من واجهات الذكاء الاصطناعي الاحترافية
+# 2. فحص لغة الجهاز/المتصفح تلقائياً
+user_lang = "ar"
+try:
+    headers = st.context.headers
+    accept_lang = headers.get("Accept-Language", "")
+    if accept_lang.startswith("en"):
+        user_lang = "en"
+except:
+    user_lang = "ar"
+
+selected_lang = st.sidebar.selectbox(
+    "🌐 Language / اللغة",
+    ("العربية", "English"),
+    index=0 if user_lang == "ar" else 1
+)
+
+is_arabic = (selected_lang == "العربية")
+
+# 3. تصميم CSS احترافي بألوان مبهجة ومتحركة واحترافية (Neon & Gradient Effects)
 st.markdown("""
     <style>
-    .main {
-        background-color: #0e1117;
+    /* خلفية التطبيق والتدرج اللوني المبهج */
+    .stApp {
+        background: linear-gradient(-45deg, #0f172a, #1e1b4b, #311042, #0f172a);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+        color: #ffffff;
     }
-    .stChatMessage {
+
+    @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    /* إطار وأزرار متحركة بألوان مبهجة */
+    .stButton>button {
+        background: linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6);
+        background-size: 200% auto;
+        color: white;
+        font-weight: bold;
         border-radius: 12px;
-        padding: 10px;
-        margin-bottom: 10px;
+        border: none;
+        padding: 10px 24px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
     }
-    .stChatInputContainer {
-        padding-bottom: 20px;
+
+    .stButton>button:hover {
+        background-position: right center;
+        transform: scale(1.03);
+        box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
+    }
+
+    /* تحسين إطار الدردشة */
+    .stChatMessage {
+        background-color: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 15px;
+        margin-bottom: 12px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("✨ المساعد الذكي التفاعلي")
-st.caption("تطبيق AI Agent متكامل يدعم المحادثة المستمرة وتفكيك المهام")
+if is_arabic:
+    st.markdown("<style>html, body, [class*='css'] { direction: rtl; text-align: right; }</style>", unsafe_allow_html=True)
+else:
+    st.markdown("<style>html, body, [class*='css'] { direction: ltr; text-align: left; }</style>", unsafe_allow_html=True)
 
-# 2. الشريط الجانبي للإعدادات وتخصيص الشخصية
+# 4. معجم النصوص والأنماط الـ 4 المطلوبة في الورقة
+texts = {
+    "ar": {
+        "title": "✨ الذكاء الاصطناعي الخارق والكامل",
+        "caption": "مزامنة تلقائية مع لغة جهازك، سرعة فائقة، ودعم التحليل المعقد والأكواد الطويلة",
+        "sidebar_title": "⚙️ محرك الاستخدام",
+        "modes": [
+            "💼 نمط تجاري وأعمال (Business)",
+            "🎨 نمط ابتكاري وإبداعي (Creative)",
+            "📊 نمط اقتصادي وتحليلي (Economic)",
+            "🧩 نمط حل المشكلات المعقدة (Problem Solving)"
+        ],
+        "temp": "مستوى المرونة والابتكار:",
+        "tokens": "أقصى طول للإجابة (يدعم الإجابات الطويلة):",
+        "upload_label": "📂 رفع ملفات أسطر/أكواد طويلة للتحليل (يدعم حتى 250 صفحة):",
+        "reset": "بدء محادثة جديدة 🔄",
+        "input_placeholder": "اسأل عن أي شيء، كود، أو مسألة صعبة بأي لغة...",
+        "thinking": "جاري التفكير والصياغة السريعة...",
+        "prompts": {
+            "💼 نمط تجاري وأعمال (Business)": "أنت خبير استشاري تجاري وإداري. قم بتقديم خطط تسويقية وإدارية احترافية بأسلوب عملي ودقيق.",
+            "🎨 نمط ابتكاري وإبداعي (Creative)": "أنت مبتكر ومبدع خارق. قدم أفكاراً غير تقليدية وحلولاً إبداعية جديدة ومميزة.",
+            "📊 نمط اقتصادي وتحليلي (Economic)": "أنت خبير اقتصادي ومحلل بيانات دقيق. قم بتقييم الأرقام والبيانات وتقديم تحليلات اقتصادية موثوقة.",
+            "🧩 نمط حل المشكلات المعقدة (Problem Solving)": "أنت مهندس ذكاء اصطناعي وخبير في تفكيك وتتبع أعقد المشاكل والأكواد البرمجية الطويلة خطوة بخطوة."
+        }
+    },
+    "en": {
+        "title": "✨ Super Ultimate AI Agent",
+        "caption": "Auto-adapts to your device language, ultra-fast, supports complex analysis & massive code/docs",
+        "sidebar_title": "⚙️ Engine Mode",
+        "modes": [
+            "💼 Business Mode",
+            "🎨 Creative Mode",
+            "📊 Economic Mode",
+            "🧩 Complex Problem Solving"
+        ],
+        "temp": "Flexibility & Creativity Level:",
+        "tokens": "Max Output Tokens (Supports Long Responses):",
+        "upload_label": "📂 Upload large files/code for deep analysis (Up to 250 pages):",
+        "reset": "Start New Session 🔄",
+        "input_placeholder": "Ask anything, code, or complex queries in any language...",
+        "thinking": "Fast processing & reasoning...",
+        "prompts": {
+            "💼 Business Mode": "You are an expert business consultant. Provide high-level professional strategies.",
+            "🎨 Creative Mode": "You are a creative genius. Generate highly original and innovative ideas.",
+            "📊 Economic Mode": "You are an expert economist and data analyst. Provide deep economic and data analysis.",
+            "🧩 Complex Problem Solving": "You are an AI engineer specializing in solving complex multi-step problems and long codebases."
+        }
+    }
+}
+
+t = texts["ar" if is_arabic else "en"]
+
+st.title(t["title"])
+st.caption(t["caption"])
+
+# 5. إعداد الاتصال بالسيرفر السريع Qwen2.5-7B
+HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
+if not HF_TOKEN:
+    st.error("⚠️ يرجى إدخال HF_TOKEN في Streamlit Secrets لضمان السرعة العالية!")
+    st.stop()
+
+MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
+
+# 6. القائمة الجانبية (الشريط الجانبي)
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/bot.png", width=70)
-    st.title("تخصيص الـ Agent")
-    
-    personality = st.radio(
-        "اختر نمط المساعد:",
-        ("✨ متكامل وتفاعلي (Gemini Style)", "💻 خبير تقني وبرمجة", "📋 منظم ومحلل مهام")
-    )
+    st.title(t["sidebar_title"])
+    selected_mode = st.radio("اختر المحرك المناسب:", t["modes"])
+    st.divider()
+    temperature = st.slider(t["temp"], 0.1, 1.0, 0.4, 0.1)
+    max_tokens = st.slider(t["tokens"], 200, 2000, 800, 100)
     
     st.divider()
-    
-    temperature = st.slider("مستوى المرونة والابتكار:", 0.1, 1.0, 0.4, 0.1)
-    max_tokens = st.slider("أقصى طول للإجابة:", 150, 600, 350, 50)
+    uploaded_file = st.file_uploader(t["upload_label"], type=["txt", "py", "md", "csv", "json"])
     
     st.divider()
-    
-    if st.button("بدء محادثة جديدة 🔄", use_container_width=True):
+    if st.button(t["reset"], use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
-# 3. تحميل النموذج
-@st.cache_resource
-def load_model():
-    model_id = "Qwen/Qwen1.5-0.5B-Chat"
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        torch_dtype=torch.float16,
-        device_map="auto"
-    )
-    pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
-    return tokenizer, pipe
-
-tokenizer, pipe = load_model()
-
-# 4. توجيه النظام (System Prompts)
-system_prompts = {
-    "✨ متكامل وتفاعلي (Gemini Style)": "أنت مساعد ذكاء اصطناعي ذكي، متعاون، وبسيط في الشرح. أجب بوضوح ودقة باللغة العربية مع دعم التنسيق المنظم.",
-    "💻 خبير تقني وبرمجة": "أنت مهندس برمجيات وخبير تقني. قدم حلولاً برمجية نظيفة مع شرح الكود والخطوات. أجب باللغة العربية.",
-    "📋 منظم ومحلل مهام": "أنت خبير في إدارة المشاريع والمهام. قم بتفكيك الأهداف الصعبة إلى 3-5 خطوات تنفيذية مباشرة. أجب باللغة العربية."
-}
-
-# 5. إدارة سياق وذاكرة المحادثة
+# 7. إدارة سجل المحادثات
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض سياق الحوار السابق
 for msg in st.session_state.messages:
-    avatar = "🧑‍💻" if msg["role"] == "user" else "✨"
+    avatar = "🧑‍💻" if msg["role"] == "user" else "⚡"
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-# 6. استقبال المدخلات وتوليد الرد بالبث التفاعلي
-if user_prompt := st.chat_input("اسألني عن أي شيء أو اطلب مهمة..."):
-    # إضافة ورسم رسالة المستخدم
+# 8. استقبال المدخلات والملفات وإرسالها للمحرك
+if user_prompt := st.chat_input(t["input_placeholder"]):
+    full_user_content = user_prompt
+    
+    # قراءة الملفات الكبيرة لو تم رفعها
+    if uploaded_file is not None:
+        file_content = uploaded_file.read().decode("utf-8", errors="ignore")
+        full_user_content += f"\n\n--- [المحتوى المرفق من الملف ({uploaded_file.name})] ---\n{file_content[:15000]}"
+
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user", avatar="🧑‍💻"):
         st.markdown(user_prompt)
 
-    # معالجة وتوليد الرد
-    with st.chat_message("assistant", avatar="✨"):
+    with st.chat_message("assistant", avatar="⚡"):
         message_placeholder = st.empty()
         
-        # إعداد الرسائل وتغذية سياق الحوار الكامل للنموذج
-        formatted_messages = [{"role": "system", "content": system_prompts[personality]}]
-        for m in st.session_state.messages:
-            formatted_messages.append({"role": m["role"], "content": m["content"]})
-            
-        formatted_input = tokenizer.apply_chat_template(
-            formatted_messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+        system_prompt = t["prompts"][selected_mode]
+        api_messages = [{"role": "system", "content": system_prompt}]
         
-        with st.spinner("جاري صياغة الإجابة..."):
-            outputs = pipe(
-                formatted_input,
-                max_new_tokens=max_tokens,
-                do_sample=True,
-                temperature=temperature,
-                repetition_penalty=1.2
-            )
+        for m in st.session_state.messages[:-1]:
+            api_messages.append({"role": m["role"], "content": m["content"]})
+        api_messages.append({"role": "user", "content": full_user_content})
             
-            full_text = outputs[0]["generated_text"]
-            response_text = full_text.split("<|im_start|>assistant\n")[-1].replace("<|im_end|>", "").strip()
+        with st.spinner(t["thinking"]):
+            try:
+                response = client.chat_completion(
+                    messages=api_messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+                response_text = response.choices[0].message.content
+                message_placeholder.markdown(response_text)
+                st.session_state.messages.append({"role": "assistant", "content": response_text})
+            except Exception as e:
+                st.error(f"حدث خطأ أثناء المعالجة: {e}")
 
-        # محاكاة تأثير ظهور النص التدريجي (Streaming Effect)
-        displayed_text = ""
-        for chunk in response_text.split(" "):
-            displayed_text += chunk + " "
-            time.sleep(0.03)
-            message_placeholder.markdown(displayed_text + "▌")
-        
-        message_placeholder.markdown(response_text)
-
-    # حفظ الرد في ذاكرة المحادثة
-    st.session_state.messages.append({"role": "assistant", "content": response_text})
