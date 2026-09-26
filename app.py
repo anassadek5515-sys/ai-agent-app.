@@ -1,17 +1,18 @@
 import streamlit as st
 import os
-import io
-from PIL import Image
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 
 # 1. إعدادات الشاشة
 st.set_page_config(page_title="Super AI Agent", page_icon="✨", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS احترافي ومتوافق مع الموبايل
+# 2. تصميم CSS صارم لإلغاء أي ألوان بيضاء من نظام الأندرويد نهائياً
 st.markdown("""
     <style>
-    :root { color-scheme: dark !important; }
+    :root {
+        color-scheme: dark !important;
+    }
+    
     [data-testid="collapsedControl"], [data-testid="stSidebar"], #MainMenu, header, footer { display: none !important; }
     
     html, body, .stApp { 
@@ -26,6 +27,7 @@ st.markdown("""
         text-align: right;
     }
 
+    /* فقاعات المحادثة */
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
         background-color: #242526 !important;
         border-radius: 18px !important;
@@ -42,22 +44,32 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* مربع الإدخال */
-    div[data-testid="stChatInput"], .stChatInputContainer {
+    /* --- التغلب على خلفية WebView البيضاء بالكامل --- */
+    div[data-testid="stChatInput"],
+    div[data-testid="stBottom"],
+    .stChatInputContainer,
+    div[data-baseweb="input"],
+    div[data-baseweb="base-input"] {
         background-color: #1E1E1E !important;
+        background: #1E1E1E !important;
         border-radius: 25px !important;
         border: 1px solid #444444 !important;
     }
 
-    .stChatInputContainer textarea {
+    /* إجبار النص داخل حقل الإدخال وحاوياته على اللون الأبيض */
+    .stChatInputContainer textarea,
+    div[data-testid="stChatInput"] textarea,
+    div[data-testid="stChatInput"] * {
         background-color: #1E1E1E !important;
+        background: #1E1E1E !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
         -webkit-appearance: none !important;
-        font-size: 16px !important;
+        box-shadow: none !important;
     }
 
-    .stChatInputContainer textarea::placeholder {
+    .stChatInputContainer textarea::placeholder,
+    div[data-testid="stChatInput"] textarea::placeholder {
         color: #888888 !important;
         -webkit-text-fill-color: #888888 !important;
     }
@@ -90,13 +102,12 @@ def search_web(query, max_results=3):
     except Exception:
         return ""
 
-# دالة توليد الصور
 def generate_image(prompt):
     try:
         client = InferenceClient(model=IMAGE_MODEL, token=HF_TOKEN)
         image = client.text_to_image(prompt)
         return image
-    except Exception as e:
+    except Exception:
         return None
 
 st.markdown("<h2 style='text-align: center; color: #FFFFFF;'>✨ أنس AI</h2>", unsafe_allow_html=True)
@@ -128,7 +139,6 @@ for msg in st.session_state.messages:
         else:
             st.markdown(msg["content"])
 
-# استقبال إدخال المستخدم
 placeholder_text = "اكتب وصف الصورة بالإنجليزية أو العربية..." if mode == "🎨 رسم صورة" else "اسألني عن أي شيء..."
 
 if user_prompt := st.chat_input(placeholder_text):
@@ -138,7 +148,7 @@ if user_prompt := st.chat_input(placeholder_text):
 
     with st.chat_message("assistant", avatar="✨"):
         if mode == "🎨 رسم صورة":
-            with st.spinner("🎨 جاري رسم الصورة بالذكاء الاصطناعي..."):
+            with st.spinner("🎨 جاري رسم الصورة..."):
                 img = generate_image(user_prompt)
                 if img:
                     st.image(img, caption=f"رسمة: {user_prompt}")
