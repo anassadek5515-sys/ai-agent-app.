@@ -1,109 +1,69 @@
 import streamlit as st
 import os
+import base64
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 
-# 1. إعدادات الصفحة الأساسية
-st.set_page_config(
-    page_title="Super AI Agent",
-    page_icon="✨",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+# 1. إعدادات الشاشة
+st.set_page_config(page_title="Super AI Agent", page_icon="✨", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS احترافي (Dark Mode)
+# 2. تصميم CSS
 st.markdown("""
     <style>
-    [data-testid="collapsedControl"] { display: none !important; }
-    [data-testid="stSidebar"] { display: none !important; }
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-
-    .stApp {
-        background-color: #131314;
-        color: #e3e3e3;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    html, body, [class*="css"] {
-        direction: rtl;
-        text-align: right;
-    }
-
+    [data-testid="collapsedControl"], [data-testid="stSidebar"], #MainMenu, header, footer { display: none !important; }
+    .stApp { background-color: #131314; color: #e3e3e3; font-family: 'Segoe UI', sans-serif; }
+    html, body, [class*="css"] { direction: rtl; text-align: right; }
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-        background-color: #1e1f20 !important;
-        border-radius: 20px !important;
-        padding: 15px 20px !important;
-        margin: 10px 0 !important;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background-color: #1e1f20 !important; border-radius: 20px !important; padding: 15px 20px !important; margin: 10px 0 !important;
     }
-
     [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) {
-        background-color: transparent !important;
-        padding: 15px 10px !important;
-        margin: 10px 0 !important;
+        background-color: transparent !important; padding: 15px 10px !important; margin: 10px 0 !important;
     }
-
     .stChatInputContainer {
-        background-color: #1e1f20 !important;
-        border-radius: 30px !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        padding: 5px 10px;
-        transition: all 0.3s ease-in-out;
-    }
-    .stChatInputContainer:focus-within {
-        border: 1px solid #6366f1 !important;
-        box-shadow: 0 0 15px rgba(99, 102, 241, 0.3) !important;
+        background-color: #1e1f20 !important; border-radius: 30px !important; border: 1px solid rgba(255,255,255,0.1) !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. إعداد المفتاح
+# 3. المفتاح والنماذج
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
-
 if not HF_TOKEN:
-    st.error("⚠️ يرجى إدخال HF_TOKEN في إعدادات Secrets على Streamlit Cloud.")
+    st.error("⚠️ يرجى إضافة HF_TOKEN في Secrets.")
     st.stop()
 
-# قائمة النماذج المتاحة مجاناً للتحويل التلقائي عند الضغط على السيرفر
 AVAILABLE_MODELS = [
     "meta-llama/Meta-Llama-3.1-8B-Instruct",
     "Qwen/Qwen2.5-Coder-7B-Instruct",
     "mistralai/Mistral-7B-Instruct-v0.3"
 ]
 
-# 🌐 دالة البحث السريع في الإنترنت
 def search_web(query, max_results=3):
     try:
         results = []
         with DDGS() as ddgs:
             for r in ddgs.text(query, max_results=max_results):
-                results.append(f"- المصدر: {r['title']}\n  الملخص: {r['body']}\n  الرابط: {r['href']}")
+                results.append(f"- المصدر: {r['title']}\n  الملخص: {r['body']}")
         return "\n".join(results)
     except Exception:
         return ""
 
-# 4. الواجهة الرئيسية
-st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 5px;'>✨ أنا مساعدك الخارق.. اسألني أو ابحث معي في الإنترنت!</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: white;'>✨ مساعدك الذكي الخارق</h2>", unsafe_allow_html=True)
+
+# خيار رفع صورة لتحليلها
+uploaded_image = st.file_uploader("📷 ارفق صورة لتحليلها (اختياري)", type=["jpg", "png", "jpeg"])
 
 col1, col2, col3 = st.columns([4, 1, 4])
 with col2:
-    if st.button("🧹 محادثة جديدة", use_container_width=True):
+    if st.button("🧹 جديد", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# 5. التوجيهات الخارقة للذكاء الاصطناعي
-SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي خارق ومتقدم، تمتلك الوصول المباشر للإنترنت ولديك المعرفة الكاملة بجميع العلوم.
+SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي خارق ومتقدم، تمتلك الوصول المباشر للإنترنت وتحليل البيانات.
 قواعد الإجابة:
-1. الفهم والدقة: أجب بدقة وبشكل مفصل ومباشر باللغة العربية.
-2. التنظيم: استخدم العناوين والخط العريض (Bold) والنقاط لجعل الإجابة مريحة ومنظمة.
-3. معالجة نتائج البحث: إذا تم تزويدك بـ "نتائج بحث من الإنترنت"، استخدمها لصياغة إجابة محدثة ودقيقة جداً.
-4. الثقة: تحدث بثقة واحترافية عالية كأفضل ذكاء اصطناعي في العالم."""
+1. الفهم والدقة: أجب بدقة وشكل مفصل ومباشر باللغة العربية.
+2. التنظيم: استخدم العناوين والخط العريض (Bold) والنقاط.
+3. المظهر: أجب بتنسيق احترافي جداً وبثقة."""
 
-# 6. إدارة سجل المحادثات
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -112,8 +72,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-# 7. معالجة إدخال المستخدم وتوليد الرد مع التحويل التلقائي بين السيرفرات
-if user_prompt := st.chat_input("اسألني عن أي شيء، أخبار، أو كود..."):
+if user_prompt := st.chat_input("اسألني عن أي شيء، كود، أو صورة..."):
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_prompt)
@@ -121,12 +80,14 @@ if user_prompt := st.chat_input("اسألني عن أي شيء، أخبار، أ
     with st.chat_message("assistant", avatar="✨"):
         message_placeholder = st.empty()
         
-        with st.spinner("🔍 جاري البحث في الإنترنت والتفكير..."):
+        with st.spinner("🔍 جاري المعالجة والتفكير..."):
             search_context = search_web(user_prompt)
-            
             system_instruction = SUPER_SYSTEM_PROMPT
+            
             if search_context:
-                system_instruction += f"\n\n--- [نتائج البحث الحي المباشر من الإنترنت] ---\n{search_context}"
+                system_instruction += f"\n\n--- [نتائج البحث الحي من الإنترنت] ---\n{search_context}"
+            if uploaded_image:
+                system_instruction += f"\n\n--- [ملاحظة: تم إرفاق صورة باسم {uploaded_image.name}] ---"
 
             api_messages = [{"role": "system", "content": system_instruction}]
             for m in st.session_state.messages[:-1]:
@@ -134,26 +95,18 @@ if user_prompt := st.chat_input("اسألني عن أي شيء، أخبار، أ
             api_messages.append({"role": "user", "content": user_prompt})
 
             response_text = None
-            last_error = None
-
-            # التجربة التلقائية للنماذج المتاحة
             for model_id in AVAILABLE_MODELS:
                 try:
                     client = InferenceClient(model=model_id, token=HF_TOKEN)
-                    response = client.chat_completion(
-                        messages=api_messages,
-                        max_tokens=4096,
-                        temperature=0.3,
-                    )
+                    response = client.chat_completion(messages=api_messages, max_tokens=4096, temperature=0.3)
                     response_text = response.choices[0].message.content
-                    if response_text:
-                        break
-                except Exception as e:
-                    last_error = e
+                    if response_text: break
+                except Exception:
                     continue
 
             if response_text:
                 message_placeholder.markdown(response_text)
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
             else:
-                st.error(f"حدث خطأ أثناء الاتصال بالسيرفرات: {last_error}")
+                st.error("حدث خطأ في الاتصال بالسيرفرات.")
+
