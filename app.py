@@ -3,17 +3,19 @@ import os
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 
-# 1. إعدادات الشاشة الأساسية
+# 1. إعدادات الشاشة
 st.set_page_config(page_title="Super AI Agent", page_icon="✨", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS احترافي يحل مشكلة مربع الإدخال والألوان الداكنة على الموبايل
+# 2. تصميم CSS يفرض خلفية داكنة للخانة ونص أبيض ناصع في الأندرويد
 st.markdown("""
     <style>
     :root {
         color-scheme: dark !important;
     }
     
-    [data-testid="collapsedControl"], [data-testid="stSidebar"], #MainMenu, header, footer { display: none !important; }
+    [data-testid="collapsedControl"], [data-testid="stSidebar"], #MainMenu, header, footer { 
+        display: none !important; 
+    }
     
     html, body, .stApp { 
         background-color: #121212 !important; 
@@ -44,27 +46,31 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* حل مشكلة مربع الإدخال (خلفية داكنة + نص أبيض واضح) */
-    div[data-testid="stChatInput"] {
-        background-color: #1E1E1E !important;
-        border-radius: 25px !important;
-    }
-
-    .stChatInputContainer {
+    /* --- إجبار حقل الإدخال على الموبايل بدقة عالية --- */
+    div[data-testid="stChatInput"], 
+    .stChatInputContainer, 
+    div[data-baseweb="input"],
+    div[data-baseweb="base-input"] {
         background-color: #1E1E1E !important;
         border-radius: 25px !important;
         border: 1px solid #444444 !important;
     }
 
-    .stChatInputContainer textarea {
+    /* استهداف عنصر الكتابة نفسه ومنع الأندرويد من تغيير ألوانه */
+    .stChatInputContainer textarea, 
+    div[data-testid="stChatInput"] textarea,
+    input {
         background-color: #1E1E1E !important;
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
-        -webkit-appearance: none !important;
+        -webkit-opacity: 1 !important;
+        opacity: 1 !important;
         font-size: 16px !important;
     }
 
-    .stChatInputContainer textarea::placeholder {
+    /* نص التوضيح داخل المربع (Placeholder) */
+    .stChatInputContainer textarea::placeholder,
+    div[data-testid="stChatInput"] textarea::placeholder {
         color: #888888 !important;
         -webkit-text-fill-color: #888888 !important;
     }
@@ -150,3 +156,4 @@ if user_prompt := st.chat_input("اسألني عن أي شيء..."):
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
             else:
                 st.error("حدث خطأ في الاتصال بالسيرفرات.")
+
