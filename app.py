@@ -2,158 +2,153 @@ import streamlit as st
 import os
 from huggingface_hub import InferenceClient
 
-# 1. إعدادات الصفحة وإخفاء القائمة الجانبية
+# 1. إعدادات الصفحة الأساسية (إخفاء القائمة الجانبية تماماً)
 st.set_page_config(
-    page_title="AI Assistant",
+    page_title="AI Pro Assistant",
     page_icon="✨",
-    layout="wide",
+    layout="centered", # التمركز في المنتصف ليكون مطابقاً لواجهات الذكاء الاصطناعي
     initial_sidebar_state="collapsed"
 )
 
-# 2. تصميم CSS عصري وانسيابي (بدون قائمة جانبية وبخيارات علوية)
+# 2. تصميم CSS احترافي (Dark Mode) مطابق للذكاء الاصطناعي الحديث
 st.markdown("""
     <style>
-    /* إخفاء القائمة الجانبية بالكامل */
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-    
-    /* خلفية متدرجة وانسيابية */
-    .stApp {
-        background: linear-gradient(-45deg, #0b0f19, #111827, #1e1b4b, #0d1117);
-        background-size: 400% 400%;
-        animation: gradientBG 12s ease infinite;
-        color: #f3f4f6;
-    }
+    /* إخفاء القائمة الجانبية وعناصر Streamlit الافتراضية بالكامل */
+    [data-testid="collapsedControl"] { display: none !important; }
+    [data-testid="stSidebar"] { display: none !important; }
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
 
-    @keyframes gradientBG {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+    /* خلفية داكنة راقية ومريحة للعين */
+    .stApp {
+        background-color: #131314; /* لون خلفية احترافي */
+        color: #e3e3e3;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
     /* ضبط اتجاه النصوص للغة العربية */
     html, body, [class*="css"] {
         direction: rtl;
         text-align: right;
-        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     }
 
-    /* تحسين شكل فقاعات المحادثة */
-    .stChatMessage {
-        background: rgba(30, 41, 59, 0.4) !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 18px !important;
-        padding: 16px !important;
-        margin-bottom: 12px !important;
+    /* تنسيق رسالة المستخدم (User Bubble) */
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+        background-color: #1e1f20 !important;
+        border-radius: 20px !important;
+        padding: 15px 20px !important;
+        margin: 10px 0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
-    /* أزرار الهيدر والتصميم */
-    .stButton>button {
-        background: linear-gradient(90deg, #6366f1, #a855f7);
-        color: white;
-        font-weight: 600;
-        border-radius: 12px;
-        border: none;
-        padding: 8px 16px;
-        transition: all 0.3s ease;
+    /* تنسيق رسالة الذكاء الاصطناعي (AI Bubble) */
+    [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) {
+        background-color: transparent !important;
+        padding: 15px 10px !important;
+        margin: 10px 0 !important;
     }
-    
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+
+    /* مربع إدخال النص العائم والمنحني */
+    .stChatInputContainer {
+        background-color: #1e1f20 !important;
+        border-radius: 30px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        padding: 5px 10px;
+        transition: all 0.3s ease-in-out;
+    }
+    .stChatInputContainer:focus-within {
+        border: 1px solid #6366f1 !important;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.3) !important;
+    }
+
+    /* أزرار الخيارات العلوية (Radio Buttons) لتكون مثل الأزرار الانسيابية */
+    div[role="radiogroup"] {
+        display: flex;
+        justify-content: center;
+        background: #1e1f20;
+        padding: 10px;
+        border-radius: 25px;
+        border: 1px solid rgba(255,255,255,0.05);
+        margin-bottom: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. التأكد من المفتاح
+# 3. إعداد نموذج الذكاء الاصطناعي
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
 if not HF_TOKEN:
-    st.error("⚠️ يرجى إدخال HF_TOKEN في Secrets على Streamlit Cloud ليعمل الذكاء الاصطناعي!")
+    st.error("⚠️ يرجى إدخال HF_TOKEN في إعدادات Secrets.")
     st.stop()
 
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
 
-# 4. الهيدر والخيارات العلوية (Top Controls)
-col1, col2 = st.columns([3, 1])
+# 4. واجهة المستخدم (الخيارات العلوية)
+st.markdown("<h2 style='text-align: center; color: white; margin-bottom: 5px;'>✨ كيف يمكنني مساعدتك اليوم؟</h2>", unsafe_allow_html=True)
 
-with col1:
-    st.title("✨ المساعد الذكي المتكامل")
-    st.caption("ذكاء اصطناعي تفاعلي وسريع - أسلوب إجابات دقيق وانسيابي")
+# أزرار اختيار النمط متمركزة في الأعلى
+selected_mode = st.radio(
+    "اختر تخصص المساعد:",
+    ["💼 تجاري وأعمال", "🎨 ابتكاري وإبداعي", "📊 تحليل اقتصادي", "💻 برمجة وتقنية"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
 
+prompts = {
+    "💼 تجاري وأعمال": "أنت مساعد ذكي وخبير استشاري تجاري. قدم إجابات دقيقة واحترافية باللغة العربية.",
+    "🎨 ابتكاري وإبداعي": "أنت مساعد ذكي ومبدع. قدم أفكاراً مبتكرة وحلولاً غير تقليدية باللغة العربية.",
+    "📊 تحليل اقتصادي": "أنت مساعد ذكي وخبير اقتصادي. قدم تحليلات موثوقة ومبنية على المنطق باللغة العربية.",
+    "💻 برمجة وتقنية": "أنت مساعد ذكي ومهندس برمجيات محترف. أجب عن الأسئلة التقنية واكتب أكواداً دقيقة باللغة العربية."
+}
+
+# 5. زر مسح المحادثة بشكل خفي وأنيق
+col1, col2, col3 = st.columns([4, 1, 4])
 with col2:
-    if st.button("محادثة جديدة 🔄", use_container_width=True):
+    if st.button("🧹 محادثة جديدة", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
-# أزرار الاختيار العلوية (Pills Top Selector)
-selected_mode = st.segmented_control(
-    "اختر نمط الإجابة:",
-    [
-        "💼 تجاري وأعمال",
-        "🎨 ابتكاري وإبداعي",
-        "📊 اقتصادي وتحليلي",
-        "🧩 حل المشكلات والأكواد"
-    ],
-    default="💼 تجاري وأعمال"
-)
+st.markdown("<br>", unsafe_allow_html=True)
 
-# خيار رفع الملفات في أعلى الصفحة بشكل خفيف
-with st.expander("📂 رفع ملف أو كود للتحليل (اختياري)"):
-    uploaded_file = st.file_uploader("ارفق ملفك هنا:", type=["txt", "py", "md", "csv", "json"], label_visibility="collapsed")
-
-st.divider()
-
-# 5. التوجيهات
-prompts = {
-    "💼 تجاري وأعمال": "أنت مساعد ذكاء اصطناعي وخبير استشاري إداري وتجاري. قدم شروحات دقيقة واحترافية باللغة العربية.",
-    "🎨 ابتكاري وإبداعي": "أنت مبتكر ومبدع. قدم أفكاراً جبارة وحلولاً إبداعية جديدة باللغة العربية.",
-    "📊 اقتصادي وتحليلي": "أنت خبير اقتصادي ومحلل بيانات. قدم تحليلات موثوقة ودقيقة باللغة العربية.",
-    "🧩 حل المشكلات والأكواد": "أنت مهندس ذكاء اصطناعي خبير في حل الأكواد والمشاكل التقنية المعقدة باللغة العربية."
-}
-
-# 6. إدارة عرض المحادثات
+# 6. إدارة سجل المحادثة (Chat History)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 for msg in st.session_state.messages:
-    avatar = "🧑‍💻" if msg["role"] == "user" else "✨"
+    avatar = "👤" if msg["role"] == "user" else "✨"
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-# 7. استقبال وتوليد الردود
-if user_prompt := st.chat_input("اكتب سؤالك، كودك، أو مهمتك هنا..."):
-    full_content = user_prompt
-    if uploaded_file is not None:
-        file_text = uploaded_file.read().decode("utf-8", errors="ignore")
-        full_content += f"\n\n--- [ملف مرفق: {uploaded_file.name}] ---\n{file_text[:20000]}"
-
+# 7. مربع الإدخال الرئيسي والاستجابة (بدون حدود للطول)
+if user_prompt := st.chat_input("اكتب رسالتك هنا..."):
+    # عرض رسالة المستخدم
     st.session_state.messages.append({"role": "user", "content": user_prompt})
-    with st.chat_message("user", avatar="🧑‍💻"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(user_prompt)
 
+    # تجهيز السياق للذكاء الاصطناعي
     with st.chat_message("assistant", avatar="✨"):
         message_placeholder = st.empty()
         
-        mode_key = selected_mode if selected_mode in prompts else "💼 تجاري وأعمال"
-        api_messages = [{"role": "system", "content": prompts[mode_key]}]
+        api_messages = [{"role": "system", "content": prompts.get(selected_mode, prompts["💼 تجاري وأعمال"])}]
         
         for m in st.session_state.messages[:-1]:
             api_messages.append({"role": m["role"], "content": m["content"]})
-        api_messages.append({"role": "user", "content": full_content})
+        
+        api_messages.append({"role": "user", "content": user_prompt})
 
-        with st.spinner("جاري الصياغة والتفكير..."):
+        with st.spinner("يفكر..."):
             try:
+                # الاستدعاء بدون أي حد أقصى ليجاوب بحرية تامة
                 response = client.chat_completion(
                     messages=api_messages,
-                    max_tokens=4096,
-                    temperature=0.4,
+                    max_tokens=4096,  # السعة القصوى للاستجابات الطويلة
+                    temperature=0.3,  # دقة عالية وإجابات مركزة
                 )
                 response_text = response.choices[0].message.content
                 message_placeholder.markdown(response_text)
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
             except Exception as e:
-                st.error(f"حدث خطأ أثناء المعالجة: {e}")
+                st.error(f"حدث خطأ: {e}")
