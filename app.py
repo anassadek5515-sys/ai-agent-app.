@@ -7,22 +7,17 @@ from pypdf import PdfReader
 # 1. إعدادات الشاشة الأساسية
 st.set_page_config(page_title="Anas AI Ultra", page_icon="💎", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS الصارم لقتل الخط الأبيض
+# 2. تصميم CSS "النووي" لقتل أي لون أبيض
 st.markdown("""
     <style>
-    :root { 
-        color-scheme: dark !important; 
-        --background-color: #0d1117 !important;
-    }
-    
-    [data-testid="stSidebar"], #MainMenu, header, footer { display: none !important; }
-    
-    html, body, .stApp, .stApp > header { 
-        background-color: #0d1117 !important; 
+    /* إجبار التطبيق بالكامل على الوضع الداكن */
+    :root, body, html, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0d1117 !important;
         background: #0d1117 !important;
-        color: #c9d1d9 !important; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color-scheme: dark !important;
     }
+    
+    [data-testid="stSidebar"], #MainMenu, footer, header { display: none !important; }
     
     p, span, div, h1, h2, h3, h4, label, li {
         color: #c9d1d9 !important;
@@ -30,14 +25,13 @@ st.markdown("""
         text-align: right;
     }
 
-    /* فقاعات المحادثة */
+    /* رسائل المحادثة */
     [data-testid="stChatMessage"] {
         border-radius: 20px !important;
         padding: 15px 20px !important;
         margin: 12px 0 !important;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
     }
-
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
         background: linear-gradient(135deg, #1f6feb 0%, #1158c7 100%) !important;
         color: #ffffff !important;
@@ -46,66 +40,50 @@ st.markdown("""
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) * {
         color: #ffffff !important;
     }
-
     [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) {
         background-color: #161b22 !important;
         border: 1px solid #30363d !important;
     }
 
     /* ========================================================
-       الحل الجذري للخط الأبيض في الأندرويد
+       الضربة القاضية للشريط الأبيض والمربع البيضاوي
        ======================================================== */
        
-    /* إجبار الحاوية السفلية بالكامل على اللون الداكن بدل الشفاف */
-    div[data-testid="stBottom"], 
-    .stBottom, 
-    div[class*="stBottom"] {
-        background-color: #0d1117 !important;
-        background: #0d1117 !important;
-        border-top: none !important;
+    /* إخفاء خلفية الجزء السفلي بالكامل ودمجها مع لون الشاشة */
+    [data-testid="stBottom"], [data-testid="stBottom"] > div {
+        background-color: transparent !important;
+        background: #0d1117 !important; 
         border: none !important;
-        padding-bottom: 20px !important;
         box-shadow: none !important;
     }
 
-    div[data-testid="stChatInput"] {
-        background-color: #0d1117 !important;
-        background: #0d1117 !important;
-        border: none !important;
+    /* استهداف حاوية الإدخال الخارجية */
+    [data-testid="stChatInput"] {
+        background-color: transparent !important;
+        padding-bottom: 20px !important;
     }
 
-    /* المربع البيضاوي العائم */
-    .stChatInputContainer {
-        background-color: #131314 !important; 
-        border-radius: 35px !important; 
-        border: 1px solid #444746 !important; 
-        padding: 5px 20px !important;
-        box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.6) !important; 
-        width: 95% !important; 
-        margin: 0 auto !important; 
+    /* تحويل مربع الكتابة الداخلي لبيضاوي (Gemini Style) */
+    [data-testid="stChatInput"] > div, 
+    [data-testid="stChatInput"] > div > div {
+        background-color: #131314 !important;
+        border-radius: 35px !important; /* الحواف الدائرية البيضاوية */
+        border: 1px solid #444746 !important;
+        box-shadow: 0px 8px 24px rgba(0,0,0,0.6) !important;
+        padding: 2px 10px !important;
     }
 
-    .stChatInputContainer textarea, div[data-testid="stChatInput"] textarea {
+    /* ضبط النص جوه المربع */
+    [data-testid="stChatInput"] textarea {
         background-color: transparent !important;
         color: #e3e3e3 !important;
-        -webkit-text-fill-color: #e3e3e3 !important;
-        -webkit-appearance: none !important;
         font-size: 16px !important;
         box-shadow: none !important;
         border: none !important;
     }
 
-    .stChatInputContainer textarea::placeholder {
+    [data-testid="stChatInput"] textarea::placeholder {
         color: #8b949e !important;
-        -webkit-text-fill-color: #8b949e !important;
-    }
-    
-    .stButton > button {
-        border-radius: 20px !important;
-        border: 1px solid #30363d !important;
-        background-color: #21262d !important;
-        color: #ffffff !important;
-        transition: 0.3s;
     }
     </style>
 """, unsafe_allow_html=True)
