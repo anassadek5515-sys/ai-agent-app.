@@ -110,6 +110,12 @@ def save_message_to_db(session_id, role, content, msg_type="text"):
               (session_id, role, content, msg_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     db_conn.commit()
 
+def update_session_title(session_id, first_query):
+    c = db_conn.cursor()
+    short_title = first_query[:25] + "..." if len(first_query) > 25 else first_query
+    c.execute("UPDATE sessions SET title = ? WHERE id = ? AND title LIKE 'محادثة%'", (short_title, session_id))
+    db_conn.commit()
+
 def load_messages_from_db(session_id):
     c = db_conn.cursor()
     c.execute("SELECT role, content, type FROM messages WHERE session_id = ?", (session_id,))
@@ -163,7 +169,7 @@ with st.sidebar:
     ACTIVE_TEXT_MODEL = model_map[selected_model_name]
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v6.2<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v7.0<br>Connected 24/7</p>", unsafe_allow_html=True)
 
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
@@ -210,13 +216,22 @@ SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي ذكي وود
 current_s_id = st.session_state.current_session_id
 messages = load_messages_from_db(current_s_id)
 
-for msg in messages:
+for idx, msg in enumerate(messages):
     avatar = "👤" if msg["role"] == "user" else "💎"
     with st.chat_message(msg["role"], avatar=avatar):
         if msg.get("type") == "image":
             st.image(msg["content"], caption="الصورة المولدة")
         else:
             st.markdown(msg["content"])
+            # إضافة أزرار تفاعلية للردود (قراءة صوتية) للرسائل التابعة للمساعد
+            if msg["role"] == "assistant":
+                clean_text_for_js = msg["content"].replace('`', '').replace('"', "'").replace('\n', ' ')
+                tts_html = f"""
+                <div style="margin-top: 8px;">
+                    <button onclick="let u = new SpeechSynthesisUtterance('{clean_text_for_js}'); u.lang = 'ar-SA'; window.speechSynthesis.speak(u);" style="background:#1f6feb; color:white; border:none; padding:5px 12px; border-radius:10px; cursor:pointer; font-size:12px;">🔊 استماع للرد</button>
+                </div>
+                """
+                st.markdown(tts_html, unsafe_allow_html=True)
 
 if messages:
     chat_text_export = "\n".join([f"{m['role']}: {m['content']}" for m in messages if m.get('type') != 'image'])
@@ -225,6 +240,10 @@ if messages:
 placeholder_text = "اسألني، ابحث في الإنترنت، أو أطلب كود..." if mode == "💬 محادثة وبحث" else "اكتب وصف الصورة..."
 
 if user_prompt := st.chat_input(placeholder_text):
+    # تحقق إذا كانت هذه أول رسالة في الشات لتحديث العنوان تلقائياً
+    if not messages:
+        update_session_title(current_s_id, user_prompt)
+        
     save_message_to_db(current_s_id, "user", user_prompt, "text")
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_prompt)
@@ -266,3 +285,4 @@ if user_prompt := st.chat_input(placeholder_text):
                 if response_text:
                     message_placeholder.markdown(response_text)
                     save_message_to_db(current_s_id, "assistant", response_text, "text")
+                    st.rerun() # إعادة تحميل بسيطة لتفعيل زر الصوت للرد الجديد فوراً
