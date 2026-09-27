@@ -115,7 +115,6 @@ st.markdown("""
 # 4. لوحة التحكم والإعدادات الجانبية المنظمة
 with st.sidebar:
     st.markdown("### 👤 حساب المستخدم")
-    # محاكاة بروفایل جيميل (جاهز للربط الفعلي لاحقاً)
     st.info("📧 متصل بـ: Anas (Google Account)")
     
     st.markdown("---")
@@ -123,12 +122,12 @@ with st.sidebar:
     
     selected_model_name = st.selectbox(
         "نموذج الذكاء الاصطناعي:",
-        ("Meta Llama 3.1 (سريع وذكي)", "Qwen 2.5 Coder (ممتاز للبرمجة)", "Mistral 7B (دقيق ومتوازن)")
+        ("Qwen 2.5 Coder (سريع وممتاز)", "Mistral 7B (دقيق ومتوازن)")
     )
     
+    # تم تحديث أسماء النماذج لنماذج متاحة ونشطة حالياً
     model_map = {
-        "Meta Llama 3.1 (سريع وذكي)": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "Qwen 2.5 Coder (ممتاز للبرمجة)": "Qwen/Qwen2.5-Coder-7B-Instruct",
+        "Qwen 2.5 Coder (سريع وممتاز)": "Qwen/Qwen2.5-Coder-7B-Instruct",
         "Mistral 7B (دقيق ومتوازن)": "mistralai/Mistral-7B-Instruct-v0.3"
     }
     ACTIVE_TEXT_MODEL = model_map[selected_model_name]
@@ -139,7 +138,7 @@ with st.sidebar:
         clear_db()
         st.rerun()
         
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v4.0<br>Secured & 24/7 Live</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v4.1<br>Secured & 24/7 Live</p>", unsafe_allow_html=True)
 
 # 5. المفاتيح ووظائف المعالجة
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
@@ -225,7 +224,7 @@ if user_prompt := st.chat_input(placeholder_text):
                 else:
                     search_context = search_web(user_prompt)
                     if search_context:
-                        system_instruction += f"\n\n--- [نتائج البحث] ---{search_context}"
+                        system_instruction += f"\n\n--- [نتائج البحث] ---\n{search_context}"
 
                 api_messages = [{"role": "system", "content": system_instruction}]
                 for m in messages:
