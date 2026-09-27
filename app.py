@@ -140,7 +140,7 @@ with st.sidebar:
         clear_db()
         st.rerun()
         
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v5.1<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v5.2<br>Connected 24/7</p>", unsafe_allow_html=True)
 
 # 4. المفاتيح ووظائف المعالجة
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
@@ -184,7 +184,7 @@ if mode == "📄 تحليل PDF":
 
 SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي ذكي وودود جداً اسمك 'أنس AI Ultra'.
 - إذا كان المستخدم يلقي التحية أو يدردش معك بشكل عادي، أجب عليه بلطف وبطريقة طبيعية جداً.
-- أما في الأسئلة العلمية والبحثية والبرمجية، أجب بدقة واحترافية واستخدم التنسيق والنقاط.
+- أما في الأسئلة العلمية والبحثية والبرمجية، أجب بدقة واحترلفية واستخدم التنسيق والنقاط.
 - أنت تمتلك الوصول للإنترنت للإجابة على الأسئلة الصعبة."""
 
 messages = load_messages_from_db()
