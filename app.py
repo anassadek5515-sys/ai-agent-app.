@@ -5,6 +5,7 @@ from datetime import datetime
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 from pypdf import PdfReader
+from PIL import Image
 
 st.set_page_config(page_title="Anas AI Ultra", page_icon="💎", layout="centered", initial_sidebar_state="expanded")
 
@@ -168,8 +169,9 @@ with st.sidebar:
     }
     ACTIVE_TEXT_MODEL = model_map[selected_model_name]
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
+    VISION_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v7.0<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v8.0<br>Connected 24/7</p>", unsafe_allow_html=True)
 
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
@@ -199,9 +201,11 @@ def extract_pdf_text(uploaded_file):
 
 st.markdown("<h2 style='text-align: center; color: #ffffff;'>💎 أنس AI Ultra</h2>", unsafe_allow_html=True)
 
-mode = st.radio("الوضع:", ["💬 محادثة وبحث", "🎨 رسم صورة", "📄 تحليل PDF"], horizontal=True, label_visibility="collapsed")
+mode = st.radio("الوضع:", ["💬 محادثة وبحث", "🎨 رسم صورة", "📄 تحليل PDF", "👁️ تحليل الصور والملفات"], horizontal=True, label_visibility="collapsed")
 
 pdf_context = ""
+uploaded_image = None
+
 if mode == "📄 تحليل PDF":
     uploaded_file = st.file_uploader("ارفع ملف PDF للتحليل:", type=["pdf"])
     if uploaded_file:
@@ -209,9 +213,20 @@ if mode == "📄 تحليل PDF":
             pdf_context = extract_pdf_text(uploaded_file)
             st.success("تم قراءة الملف بنجاح!")
 
+elif mode == "👁️ تحليل الصور والملفات":
+    uploaded_image = st.file_uploader("ارفع صورة (PNG, JPG) أو ملف برمجي/نصي:", type=["png", "jpg", "jpeg", "py", "txt", "js"])
+    if uploaded_image:
+        if uploaded_image.type.startswith("image"):
+            st.image(uploaded_image, caption="الصورة المرفوعة", use_container_width=True)
+            st.success("تم رفع الصورة بنجاح! اكتب سؤالك عنها في الأسفل.")
+        else:
+            code_text = uploaded_image.getvalue().decode("utf-8", errors="ignore")
+            pdf_context = f"\n\n--- [محتوى الملف المرفوع] ---\n{code_text[:4000]}"
+            st.success("تم قراءة الملف البرمجي بنجاح!")
+
 SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي ذكي وودود جداً اسمك 'أنس AI Ultra'.
 - إذا كان المستخدم يلقي التحية أو يدردش معك بشكل عادي، أجب عليه بلطف وبطريقة طبيعية جداً.
-- أما في الأسئلة العلمية والبحثية والبرمجية، أجب بدقة واحترافية واستخدم التنسيق والنقاط."""
+- أما في الأسئلة العلمية والبحثية والبرمجية وتحليل الصور، أجب بدقة واحترافية واستخدم التنسيق والنقاط."""
 
 current_s_id = st.session_state.current_session_id
 messages = load_messages_from_db(current_s_id)
@@ -220,10 +235,9 @@ for idx, msg in enumerate(messages):
     avatar = "👤" if msg["role"] == "user" else "💎"
     with st.chat_message(msg["role"], avatar=avatar):
         if msg.get("type") == "image":
-            st.image(msg["content"], caption="الصورة المولدة")
+            st.image(msg["content"], caption="الصورة المولدة أو المرفوعة")
         else:
             st.markdown(msg["content"])
-            # إضافة أزرار تفاعلية للردود (قراءة صوتية) للرسائل التابعة للمساعد
             if msg["role"] == "assistant":
                 clean_text_for_js = msg["content"].replace('`', '').replace('"', "'").replace('\n', ' ')
                 tts_html = f"""
@@ -237,16 +251,19 @@ if messages:
     chat_text_export = "\n".join([f"{m['role']}: {m['content']}" for m in messages if m.get('type') != 'image'])
     st.download_button("📥 تحميل سجل المحادثة الحالية (TXT)", chat_text_export, file_name=f"chat_{current_s_id}.txt", mime="text/plain", use_container_width=True)
 
-placeholder_text = "اسألني، ابحث في الإنترنت، أو أطلب كود..." if mode == "💬 محادثة وبحث" else "اكتب وصف الصورة..."
+placeholder_text = "اسألني، ابحث في الإنترنت، أو أطلب كود..."
+if mode == "🎨 رسم صورة": placeholder_text = "اكتب وصف الصورة..."
+elif mode == "👁️ تحليل الصور والملفات": placeholder_text = "اكتب سؤالك عن الصورة أو الملف المرفوع..."
 
 if user_prompt := st.chat_input(placeholder_text):
-    # تحقق إذا كانت هذه أول رسالة في الشات لتحديث العنوان تلقائياً
     if not messages:
         update_session_title(current_s_id, user_prompt)
         
     save_message_to_db(current_s_id, "user", user_prompt, "text")
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_prompt)
+        if uploaded_image and uploaded_image.type.startswith("image"):
+            st.image(uploaded_image, width=200)
 
     with st.chat_message("assistant", avatar="💎"):
         if mode == "🎨 رسم صورة":
@@ -259,30 +276,50 @@ if user_prompt := st.chat_input(placeholder_text):
                     st.error("تعذر رسم الصورة.")
         else:
             message_placeholder = st.empty()
-            with st.spinner("🔍 جاري المعالجة والبحث..."):
+            with st.spinner("🔍 جاري المعالجة والتحليل..."):
                 system_instruction = SUPER_SYSTEM_PROMPT
                 if pdf_context:
-                    system_instruction += f"\n\n--- [محتوى PDF] ---\n{pdf_context}"
-                else:
+                    system_instruction += f"\n\n{pdf_context}"
+                elif mode != "👁️ تحليل الصور والملفات":
                     search_context = search_web(user_prompt)
                     if search_context:
                         system_instruction += f"\n\n--- [نتائج البحث] ---\n{search_context}"
 
-                api_messages = [{"role": "system", "content": system_instruction}]
-                for m in messages:
-                    if m.get("type") != "image":
-                        api_messages.append({"role": m["role"], "content": m["content"]})
-                api_messages.append({"role": "user", "content": user_prompt})
-
                 response_text = None
                 try:
-                    client = InferenceClient(model=ACTIVE_TEXT_MODEL, token=HF_TOKEN)
-                    response = client.chat_completion(messages=api_messages, max_tokens=4096, temperature=0.3)
-                    response_text = response.choices[0].message.content
+                    client = InferenceClient(token=HF_TOKEN)
+                    
+                    # إذا كان الوضع تحليل صور وتم رفع صورة حقيقية
+                    if mode == "👁️ تحليل الصور والملفات" and uploaded_image and uploaded_image.type.startswith("image"):
+                        pil_img = Image.open(uploaded_image)
+                        response = client.chat_completion(
+                            model=VISION_MODEL,
+                            messages=[
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "image", "image": pil_img},
+                                        {"type": "text", "text": user_prompt}
+                                    ]
+                                }
+                            ],
+                            max_tokens=2048
+                        )
+                        response_text = response.choices[0].message.content
+                    else:
+                        api_messages = [{"role": "system", "content": system_instruction}]
+                        for m in messages:
+                            if m.get("type") != "image":
+                                api_messages.append({"role": m["role"], "content": m["content"]})
+                        api_messages.append({"role": "user", "content": user_prompt})
+
+                        response = client.chat_completion(model=ACTIVE_TEXT_MODEL, messages=api_messages, max_tokens=4096, temperature=0.3)
+                        response_text = response.choices[0].message.content
+                        
                 except Exception as e:
                     response_text = f"عذراً، حدث خطأ في الاتصال بالنموذج: {str(e)}"
 
                 if response_text:
                     message_placeholder.markdown(response_text)
                     save_message_to_db(current_s_id, "assistant", response_text, "text")
-                    st.rerun() # إعادة تحميل بسيطة لتفعيل زر الصوت للرد الجديد فوراً
+                    st.rerun()
