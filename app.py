@@ -73,53 +73,93 @@ p, span, div, h1, h2, h3, h4, label, li {
 </style>
 """, unsafe_allow_html=True)
 
+# 1. إعداد قاعدة البيانات لدعم جلسات المحادثة المتعددة (Sessions)
 def init_db():
     conn = sqlite3.connect("chat_history.db", check_same_thread=False)
     c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS sessions 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, timestamp TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS messages 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
     conn.commit()
     return conn
 
 db_conn = init_db()
 
-def save_message_to_db(role, content, msg_type="text"):
+def get_or_create_default_session():
     c = db_conn.cursor()
-    c.execute("INSERT INTO messages (role, content, type, timestamp) VALUES (?, ?, ?, ?)",
-              (role, content, msg_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    c.execute("SELECT id, title FROM sessions ORDER BY id DESC LIMIT 1")
+    row = c.fetchone()
+    if row:
+        return row[0]
+    else:
+        c.execute("INSERT INTO sessions (title, timestamp) VALUES (?, ?)", 
+                  ("محادثة جديدة", datetime.now().strftime("%Y-%m-%d %H:%M")))
+        db_conn.commit()
+        return c.lastrowid
+
+if "current_session_id" not in st.session_state:
+    st.session_state.current_session_id = get_or_create_default_session()
+
+def save_message_to_db(session_id, role, content, msg_type="text"):
+    c = db_conn.cursor()
+    c.execute("INSERT INTO messages (session_id, role, content, type, timestamp) VALUES (?, ?, ?, ?, ?)",
+              (session_id, role, content, msg_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     db_conn.commit()
 
-def load_messages_from_db():
+def load_messages_from_db(session_id):
     c = db_conn.cursor()
-    c.execute("SELECT role, content, type FROM messages")
+    c.execute("SELECT role, content, type FROM messages WHERE session_id = ?", (session_id,))
     rows = c.fetchall()
     return [{"role": r[0], "content": r[1], "type": r[2]} for r in rows]
 
-def clear_db():
+def create_new_session():
     c = db_conn.cursor()
-    c.execute("DELETE FROM messages")
+    c.execute("INSERT INTO sessions (title, timestamp) VALUES (?, ?)", 
+              (f"محادثة {datetime.now().strftime('%H:%M')}", datetime.now().strftime("%Y-%m-%d %H:%M")))
     db_conn.commit()
+    st.session_state.current_session_id = c.lastrowid
 
+def get_all_sessions():
+    c = db_conn.cursor()
+    c.execute("SELECT id, title FROM sessions ORDER BY id DESC")
+    return c.fetchall()
+
+# 2. لوحة التحكم الجانبية مع إدارة الشاتات
 with st.sidebar:
     st.markdown("### 👤 حساب المستخدم")
     st.info("📧 متصل بـ: Anas (Google Account)")
+    
     st.markdown("---")
+    if st.button("➕ محادثة جديدة (New Chat)", use_container_width=True, type="primary"):
+        create_new_session()
+        st.rerun()
+        
+    st.markdown("### 💬 سجل المحادثات")
+    sessions = get_all_sessions()
+    for s_id, s_title in sessions:
+        btn_type = "secondary" if s_id != st.session_state.current_session_id else "primary"
+        if st.button(f"📁 {s_title}", key=f"session_{s_id}", use_container_width=True, type=btn_type):
+            st.session_state.current_session_id = s_id
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### ⚙️ إعدادات النظام")
     selected_model_name = st.selectbox(
         "نموذج الذكاء الاصطناعي:",
         ("Qwen 2.5 Coder (سريع وممتاز)", "Mistral 7B (دقيق ومتوازن)")
     )
+    
     model_map = {
         "Qwen 2.5 Coder (سريع وممتاز)": "Qwen/Qwen2.5-Coder-7B-Instruct",
         "Mistral 7B (دقيق ومتوازن)": "mistralai/Mistral-7B-Instruct-v0.3"
     }
     ACTIVE_TEXT_MODEL = model_map[selected_model_name]
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
-    st.markdown("---")
-    if st.button("🗑️ مسح الذاكرة الحالية", use_container_width=True):
-        clear_db()
-        st.rerun()
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v5.3<br>Connected 24/7</p>", unsafe_allow_html=True)
 
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v6.0<br>Connected 24/7</p>", unsafe_allow_html=True)
+
+# 3. المفاتيح ووظائف المعالجة
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
     st.error("⚠️ يرجى إضافة HF_TOKEN في Secrets.")
@@ -146,6 +186,7 @@ def extract_pdf_text(uploaded_file):
         return "".join([page.extract_text() or "" for page in reader.pages])[:4000]
     except Exception: return ""
 
+# 4. الواجهة الرئيسية
 st.markdown("<h2 style='text-align: center; color: #ffffff;'>💎 أنس AI Ultra</h2>", unsafe_allow_html=True)
 
 mode = st.radio("الوضع:", ["💬 محادثة وبحث", "🎨 رسم صورة", "📄 تحليل PDF"], horizontal=True, label_visibility="collapsed")
@@ -162,7 +203,8 @@ SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي ذكي وود
 - إذا كان المستخدم يلقي التحية أو يدردش معك بشكل عادي، أجب عليه بلطف وبطريقة طبيعية جداً.
 - أما في الأسئلة العلمية والبحثية والبرمجية، أجب بدقة واحترافية واستخدم التنسيق والنقاط."""
 
-messages = load_messages_from_db()
+current_s_id = st.session_state.current_session_id
+messages = load_messages_from_db(current_s_id)
 
 for msg in messages:
     avatar = "👤" if msg["role"] == "user" else "💎"
@@ -174,12 +216,12 @@ for msg in messages:
 
 if messages:
     chat_text_export = "\n".join([f"{m['role']}: {m['content']}" for m in messages if m.get('type') != 'image'])
-    st.download_button("📥 تحميل سجل المحادثة (TXT)", chat_text_export, file_name="anas_ai_chat.txt", mime="text/plain", use_container_width=True)
+    st.download_button("📥 تحميل سجل المحادثة الحالية (TXT)", chat_text_export, file_name=f"chat_{current_s_id}.txt", mime="text/plain", use_container_width=True)
 
 placeholder_text = "اسألني، ابحث في الإنترنت، أو أطلب كود..." if mode == "💬 محادثة وبحث" else "اكتب وصف الصورة..."
 
 if user_prompt := st.chat_input(placeholder_text):
-    save_message_to_db("user", user_prompt, "text")
+    save_message_to_db(current_s_id, "user", user_prompt, "text")
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_prompt)
 
@@ -189,7 +231,7 @@ if user_prompt := st.chat_input(placeholder_text):
                 img = generate_image(user_prompt)
                 if img:
                     st.image(img, caption=f"رسمة: {user_prompt}")
-                    save_message_to_db("assistant", "[صورة مولدة]", "image")
+                    save_message_to_db(current_s_id, "assistant", "[صورة مولدة]", "image")
                 else:
                     st.error("تعذر رسم الصورة.")
         else:
@@ -219,4 +261,4 @@ if user_prompt := st.chat_input(placeholder_text):
 
                 if response_text:
                     message_placeholder.markdown(response_text)
-                    save_message_to_db("assistant", response_text, "text")
+                    save_message_to_db(current_s_id, "assistant", response_text, "text")
