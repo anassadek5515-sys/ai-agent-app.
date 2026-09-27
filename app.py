@@ -73,7 +73,7 @@ p, span, div, h1, h2, h3, h4, label, li {
 </style>
 """, unsafe_allow_html=True)
 
-# 1. إعداد قاعدة البيانات لدعم جلسات المحادثة المتعددة (Sessions)
+# 1. إعداد وتحديث قاعدة البيانات تلقائياً لمنع أي أخطاء
 def init_db():
     conn = sqlite3.connect("chat_history.db", check_same_thread=False)
     c = conn.cursor()
@@ -81,6 +81,13 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, timestamp TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS messages 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
+    
+    # التأكد من وجود عمود session_id لضمان عدم ظهور أخطاء مع البيانات القديمة
+    try:
+        c.execute("ALTER TABLE messages ADD COLUMN session_id INTEGER")
+    except sqlite3.OperationalError:
+        pass # العمود موجود مسبقاً
+        
     conn.commit()
     return conn
 
@@ -137,6 +144,10 @@ with st.sidebar:
         
     st.markdown("### 💬 سجل المحادثات")
     sessions = get_all_sessions()
+    if not sessions:
+        create_new_session()
+        sessions = get_all_sessions()
+        
     for s_id, s_title in sessions:
         btn_type = "secondary" if s_id != st.session_state.current_session_id else "primary"
         if st.button(f"📁 {s_title}", key=f"session_{s_id}", use_container_width=True, type=btn_type):
@@ -157,7 +168,7 @@ with st.sidebar:
     ACTIVE_TEXT_MODEL = model_map[selected_model_name]
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v6.0<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v6.1<br>Connected 24/7</p>", unsafe_allow_html=True)
 
 # 3. المفاتيح ووظائف المعالجة
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
