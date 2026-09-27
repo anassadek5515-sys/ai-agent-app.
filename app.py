@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import sqlite3
+import sys
+import io
 from datetime import datetime
 from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
@@ -137,7 +139,6 @@ def delete_session(session_id):
     c.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
     c.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     db_conn.commit()
-    # اختيار محادثة أخرى إذا توفرت
     c.execute("SELECT id FROM sessions ORDER BY id DESC LIMIT 1")
     row = c.fetchone()
     if row:
@@ -160,6 +161,19 @@ def add_memory(fact):
     c = db_conn.cursor()
     c.execute("INSERT INTO memory (fact, timestamp) VALUES (?, ?)", (fact, datetime.now().strftime("%Y-%m-%d %H:%M")))
     db_conn.commit()
+
+def execute_python_code(code_string):
+    old_stdout = sys.stdout
+    new_stdout = io.StringIO()
+    sys.stdout = new_stdout
+    try:
+        exec(code_string, {})
+        output = new_stdout.getvalue()
+    except Exception as e:
+        output = f"خطأ في التنفيذ: {str(e)}"
+    finally:
+        sys.stdout = old_stdout
+    return output
 
 with st.sidebar:
     st.markdown("### 👤 الملف الشخصي والذاكرة")
@@ -216,7 +230,7 @@ with st.sidebar:
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
     VISION_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v10.0<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v11.0<br>AI Agent & Execution</p>", unsafe_allow_html=True)
 
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
@@ -291,11 +305,22 @@ for idx, msg in enumerate(messages):
             if msg["role"] == "assistant":
                 clean_text_for_js = msg["content"].replace('`', '').replace('"', "'").replace('\n', ' ')
                 tts_html = f"""
-                <div style="margin-top: 8px;">
+                <div style="margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;">
                     <button onclick="let u = new SpeechSynthesisUtterance('{clean_text_for_js}'); u.lang = 'ar-SA'; window.speechSynthesis.speak(u);" style="background:#1f6feb; color:white; border:none; padding:5px 12px; border-radius:10px; cursor:pointer; font-size:12px;">🔊 استماع للرد</button>
                 </div>
                 """
                 st.markdown(tts_html, unsafe_allow_html=True)
+                
+                # إضافة زر تشغيل الكود لو الإجابة بتحتوي على كود بايثون
+                if "```python" in msg["content"]:
+                    try:
+                        extracted_code = msg["content"].split("```python")[1].split("```")[0]
+                        if st.button("▶️ تنفيذ كود البايثون فوراً", key=f"run_code_{idx}"):
+                            with st.spinner("⚙️ جاري تنفيذ الكود محلياً..."):
+                                exec_result = execute_python_code(extracted_code)
+                                st.code(exec_result, language="text")
+                    except Exception:
+                        pass
 
 if messages:
     chat_text_export = "\n".join([f"{m['role']}: {m['content']}" for m in messages if m.get('type') != 'image'])
