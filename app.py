@@ -81,6 +81,8 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, timestamp TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS messages 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS memory 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, fact TEXT, timestamp TEXT)''')
     try:
         c.execute("ALTER TABLE messages ADD COLUMN session_id INTEGER")
     except sqlite3.OperationalError:
@@ -135,10 +137,35 @@ def get_all_sessions():
     c.execute("SELECT id, title FROM sessions ORDER BY id DESC")
     return c.fetchall()
 
+def get_user_memories():
+    c = db_conn.cursor()
+    c.execute("SELECT fact FROM memory ORDER BY id DESC LIMIT 10")
+    rows = c.fetchall()
+    return [r[0] for r in rows]
+
+def add_memory(fact):
+    c = db_conn.cursor()
+    c.execute("INSERT INTO memory (fact, timestamp) VALUES (?, ?)", (fact, datetime.now().strftime("%Y-%m-%d %H:%M")))
+    db_conn.commit()
+
 with st.sidebar:
-    st.markdown("### 👤 حساب المستخدم")
+    st.markdown("### 👤 الملف الشخصي والذاكرة")
     st.info("📧 متصل بـ: Anas (Google Account)")
     
+    # عرض الذاكرة طويلة المدى للمستخدم
+    memories = get_user_memories()
+    if memories:
+        with st.expander("🧠 ماذا أعرف عنك؟ (الذاكرة)"):
+            for mem in memories:
+                st.write(f"- {mem}")
+    
+    new_fact = st.text_input("🧠 أضف معلومة لذاكرة المساعد:", placeholder="مثلاً: أنا مهندس برمجيات...")
+    if st.button("حفظ في الذاكرة الأبدية", use_container_width=True):
+        if new_fact:
+            add_memory(new_fact)
+            st.success("تم الحفظ في ذاكرة أنس AI بنجاح!")
+            st.rerun()
+
     st.markdown("---")
     if st.button("➕ محادثة جديدة (New Chat)", use_container_width=True, type="primary"):
         create_new_session()
@@ -171,7 +198,7 @@ with st.sidebar:
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
     VISION_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v8.0<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v9.0<br>Connected 24/7</p>", unsafe_allow_html=True)
 
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
@@ -224,9 +251,15 @@ elif mode == "👁️ تحليل الصور والملفات":
             pdf_context = f"\n\n--- [محتوى الملف المرفوع] ---\n{code_text[:4000]}"
             st.success("تم قراءة الملف البرمجي بنجاح!")
 
-SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي ذكي وودود جداً اسمك 'أنس AI Ultra'.
-- إذا كان المستخدم يلقي التحية أو يدردش معك بشكل عادي، أجب عليه بلطف وبطريقة طبيعية جداً.
-- أما في الأسئلة العلمية والبحثية والبرمجية وتحليل الصور، أجب بدقة واحترافية واستخدم التنسيق والنقاط."""
+# دمج الذكريات طويلة المدى داخل نظام التوجيه (System Prompt)
+user_memories_list = get_user_memories()
+memory_section = ""
+if user_memories_list:
+    memory_section = "\n\n--- [معلومات عن المستخدم 'أنس' مسجلة في الذاكرة طويلة المدى] ---\n" + "\n".join([f"- {m}" for m in user_memories_list])
+
+SUPER_SYSTEM_PROMPT = f"""أنت مساعد ذكاء اصطناعي ذكي وودود جداً اسمك 'أنس AI Ultra'، وصاحب التطبيق والمستخدم الأساسي لك هو 'أنس'.
+- إذا كان المستخدم يلقي التحية أو يدردش معك بشكل عادي، أجب عليه بلطف وبطريقة شخصية كأنك تعرفه جيداً.
+- أما في الأسئلة العلمية والبحثية والبرمجية وتحليل الصور، أجب بدقة واحترافية واستخدم التنسيق والنقاط.{memory_section}"""
 
 current_s_id = st.session_state.current_session_id
 messages = load_messages_from_db(current_s_id)
@@ -289,7 +322,6 @@ if user_prompt := st.chat_input(placeholder_text):
                 try:
                     client = InferenceClient(token=HF_TOKEN)
                     
-                    # إذا كان الوضع تحليل صور وتم رفع صورة حقيقية
                     if mode == "👁️ تحليل الصور والملفات" and uploaded_image and uploaded_image.type.startswith("image"):
                         pil_img = Image.open(uploaded_image)
                         response = client.chat_completion(
