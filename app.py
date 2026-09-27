@@ -6,39 +6,14 @@ from huggingface_hub import InferenceClient
 from duckduckgo_search import DDGS
 from pypdf import PdfReader
 
-# 1. إعدادات الشاشة الأساسية
+# 1. إعدادات الشاشة الأساسية وربط ملف الـ PWA Manifest
 st.set_page_config(page_title="Anas AI Ultra", page_icon="💎", layout="centered", initial_sidebar_state="expanded")
 
-# 2. إعداد قاعدة البيانات لـ SQLite
-def init_db():
-    conn = sqlite3.connect("chat_history.db", check_same_thread=False)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS messages 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
-    conn.commit()
-    return conn
-
-db_conn = init_db()
-
-def save_message_to_db(role, content, msg_type="text"):
-    c = db_conn.cursor()
-    c.execute("INSERT INTO messages (role, content, type, timestamp) VALUES (?, ?, ?, ?)",
-              (role, content, msg_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    db_conn.commit()
-
-def load_messages_from_db():
-    c = db_conn.cursor()
-    c.execute("SELECT role, content, type FROM messages")
-    rows = c.fetchall()
-    return [{"role": r[0], "content": r[1], "type": r[2]} for r in rows]
-
-def clear_db():
-    c = db_conn.cursor()
-    c.execute("DELETE FROM messages")
-    db_conn.commit()
-
-# 3. تصميم CSS المتقدم والداكن
 st.markdown("""
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
     :root, body, html, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: #0d1117 !important;
@@ -112,7 +87,35 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 4. لوحة التحكم والإعدادات الجانبية المنظمة
+# 2. إعداد قاعدة البيانات لـ SQLite
+def init_db():
+    conn = sqlite3.connect("chat_history.db", check_same_thread=False)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS messages 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
+    conn.commit()
+    return conn
+
+db_conn = init_db()
+
+def save_message_to_db(role, content, msg_type="text"):
+    c = db_conn.cursor()
+    c.execute("INSERT INTO messages (role, content, type, timestamp) VALUES (?, ?, ?, ?)",
+              (role, content, msg_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    db_conn.commit()
+
+def load_messages_from_db():
+    c = db_conn.cursor()
+    c.execute("SELECT role, content, type FROM messages")
+    rows = c.fetchall()
+    return [{"role": r[0], "content": r[1], "type": r[2]} for r in rows]
+
+def clear_db():
+    c = db_conn.cursor()
+    c.execute("DELETE FROM messages")
+    db_conn.commit()
+
+# 3. لوحة التحكم والإعدادات الجانبية
 with st.sidebar:
     st.markdown("### 👤 حساب المستخدم")
     st.info("📧 متصل بـ: Anas (Google Account)")
@@ -125,7 +128,6 @@ with st.sidebar:
         ("Qwen 2.5 Coder (سريع وممتاز)", "Mistral 7B (دقيق ومتوازن)")
     )
     
-    # تم تحديث أسماء النماذج لنماذج متاحة ونشطة حالياً
     model_map = {
         "Qwen 2.5 Coder (سريع وممتاز)": "Qwen/Qwen2.5-Coder-7B-Instruct",
         "Mistral 7B (دقيق ومتوازن)": "mistralai/Mistral-7B-Instruct-v0.3"
@@ -138,9 +140,9 @@ with st.sidebar:
         clear_db()
         st.rerun()
         
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v4.1<br>Secured & 24/7 Live</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v5.1<br>Connected 24/7</p>", unsafe_allow_html=True)
 
-# 5. المفاتيح ووظائف المعالجة
+# 4. المفاتيح ووظائف المعالجة
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
     st.error("⚠️ يرجى إضافة HF_TOKEN في Secrets.")
@@ -167,7 +169,7 @@ def extract_pdf_text(uploaded_file):
         return "".join([page.extract_text() or "" for page in reader.pages])[:4000]
     except Exception: return ""
 
-# 6. الواجهة الرئيسية
+# 5. الواجهة الرئيسية
 st.markdown("<h2 style='text-align: center; color: #ffffff;'>💎 أنس AI Ultra</h2>", unsafe_allow_html=True)
 
 mode = st.radio("الوضع:", ["💬 محادثة وبحث", "🎨 رسم صورة", "📄 تحليل PDF"], horizontal=True, label_visibility="collapsed")
