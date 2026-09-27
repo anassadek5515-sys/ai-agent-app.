@@ -73,7 +73,6 @@ p, span, div, h1, h2, h3, h4, label, li {
 </style>
 """, unsafe_allow_html=True)
 
-# 1. إعداد وتحديث قاعدة البيانات تلقائياً لمنع أي أخطاء
 def init_db():
     conn = sqlite3.connect("chat_history.db", check_same_thread=False)
     c = conn.cursor()
@@ -81,13 +80,10 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, timestamp TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS messages 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, role TEXT, content TEXT, type TEXT, timestamp TEXT)''')
-    
-    # التأكد من وجود عمود session_id لضمان عدم ظهور أخطاء مع البيانات القديمة
     try:
         c.execute("ALTER TABLE messages ADD COLUMN session_id INTEGER")
     except sqlite3.OperationalError:
-        pass # العمود موجود مسبقاً
-        
+        pass
     conn.commit()
     return conn
 
@@ -132,7 +128,6 @@ def get_all_sessions():
     c.execute("SELECT id, title FROM sessions ORDER BY id DESC")
     return c.fetchall()
 
-# 2. لوحة التحكم الجانبية مع إدارة الشاتات
 with st.sidebar:
     st.markdown("### 👤 حساب المستخدم")
     st.info("📧 متصل بـ: Anas (Google Account)")
@@ -158,19 +153,18 @@ with st.sidebar:
     st.markdown("### ⚙️ إعدادات النظام")
     selected_model_name = st.selectbox(
         "نموذج الذكاء الاصطناعي:",
-        ("Qwen 2.5 Coder (سريع وممتاز)", "Mistral 7B (دقيق ومتوازن)")
+        ("Qwen 2.5 Coder (سريع وممتاز)", "Llama 3.1 8B (دقيق وقوي)")
     )
     
     model_map = {
         "Qwen 2.5 Coder (سريع وممتاز)": "Qwen/Qwen2.5-Coder-7B-Instruct",
-        "Mistral 7B (دقيق ومتوازن)": "mistralai/Mistral-7B-Instruct-v0.3"
+        "Llama 3.1 8B (دقيق وقوي)": "meta-llama/Meta-Llama-3.1-8B-Instruct"
     }
     ACTIVE_TEXT_MODEL = model_map[selected_model_name]
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v6.1<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v6.2<br>Connected 24/7</p>", unsafe_allow_html=True)
 
-# 3. المفاتيح ووظائف المعالجة
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
     st.error("⚠️ يرجى إضافة HF_TOKEN في Secrets.")
@@ -197,7 +191,6 @@ def extract_pdf_text(uploaded_file):
         return "".join([page.extract_text() or "" for page in reader.pages])[:4000]
     except Exception: return ""
 
-# 4. الواجهة الرئيسية
 st.markdown("<h2 style='text-align: center; color: #ffffff;'>💎 أنس AI Ultra</h2>", unsafe_allow_html=True)
 
 mode = st.radio("الوضع:", ["💬 محادثة وبحث", "🎨 رسم صورة", "📄 تحليل PDF"], horizontal=True, label_visibility="collapsed")
