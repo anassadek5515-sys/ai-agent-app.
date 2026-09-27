@@ -7,17 +7,19 @@ from pypdf import PdfReader
 # 1. إعدادات الشاشة الأساسية
 st.set_page_config(page_title="Anas AI Ultra", page_icon="💎", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. تصميم CSS الخارق للواجهة البيضاوية العائمة (Gemini style)
+# 2. تصميم CSS الصارم لقتل الخط الأبيض
 st.markdown("""
     <style>
-    :root { color-scheme: dark !important; }
+    :root { 
+        color-scheme: dark !important; 
+        --background-color: #0d1117 !important;
+    }
     
-    /* إخفاء العناصر غير الضرورية */
     [data-testid="stSidebar"], #MainMenu, header, footer { display: none !important; }
     
-    /* الخلفية الداكنة العامة للموقع والصفحة */
-    html, body, .stApp { 
+    html, body, .stApp, .stApp > header { 
         background-color: #0d1117 !important; 
+        background: #0d1117 !important;
         color: #c9d1d9 !important; 
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
@@ -28,7 +30,7 @@ st.markdown("""
         text-align: right;
     }
 
-    /* تصميم فقاعات المحادثة العائمة */
+    /* فقاعات المحادثة */
     [data-testid="stChatMessage"] {
         border-radius: 20px !important;
         padding: 15px 20px !important;
@@ -36,7 +38,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
     }
 
-    /* رسالة المستخدم بلون متدرج */
     [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
         background: linear-gradient(135deg, #1f6feb 0%, #1158c7 100%) !important;
         color: #ffffff !important;
@@ -46,52 +47,59 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* رسالة الذكاء الاصطناعي بلون داكن */
     [data-testid="stChatMessage"]:not(:has([data-testid="chatAvatarIcon-user"])) {
         background-color: #161b22 !important;
         border: 1px solid #30363d !important;
     }
 
     /* ========================================================
-       تصميم مربع الإدخال البيضاوي العائم (Gemini/ الصورة الثانية)
+       الحل الجذري للخط الأبيض في الأندرويد
        ======================================================== */
        
-    /* 1. إزالة الشريط السفلي تماماً وجعل الخلفية شفافة */
-    div[data-testid="stBottom"] {
-        background: transparent !important;
-        background-color: transparent !important;
+    /* إجبار الحاوية السفلية بالكامل على اللون الداكن بدل الشفاف */
+    div[data-testid="stBottom"], 
+    .stBottom, 
+    div[class*="stBottom"] {
+        background-color: #0d1117 !important;
+        background: #0d1117 !important;
+        border-top: none !important;
         border: none !important;
-        padding-bottom: 20px !important; /* رفعه قليلاً عن الكيبورد */
+        padding-bottom: 20px !important;
+        box-shadow: none !important;
     }
 
-    /* 2. تصميم الحاوية البيضاوية العائمة */
+    div[data-testid="stChatInput"] {
+        background-color: #0d1117 !important;
+        background: #0d1117 !important;
+        border: none !important;
+    }
+
+    /* المربع البيضاوي العائم */
     .stChatInputContainer {
-        background-color: #131314 !important; /* لون داكن مطابق للصورة الثانية */
-        border-radius: 35px !important; /* حواف بيضاوية دائرية بالكامل */
-        border: 1px solid #444746 !important; /* إطار رمادي خفيف */
+        background-color: #131314 !important; 
+        border-radius: 35px !important; 
+        border: 1px solid #444746 !important; 
         padding: 5px 20px !important;
-        box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.6) !important; /* تأثير ظل العوم القوي */
-        width: 95% !important; /* ترك مسافة صغيرة من الجوانب */
-        margin: 0 auto !important; /* توسيط المربع */
+        box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.6) !important; 
+        width: 95% !important; 
+        margin: 0 auto !important; 
     }
 
-    /* 3. تضبيط خط الكتابة الداخلي واللون */
-    .stChatInputContainer textarea {
+    .stChatInputContainer textarea, div[data-testid="stChatInput"] textarea {
         background-color: transparent !important;
         color: #e3e3e3 !important;
         -webkit-text-fill-color: #e3e3e3 !important;
         -webkit-appearance: none !important;
         font-size: 16px !important;
         box-shadow: none !important;
+        border: none !important;
     }
 
-    /* 4. لون نص التوضيح داخل المربع */
     .stChatInputContainer textarea::placeholder {
         color: #8b949e !important;
         -webkit-text-fill-color: #8b949e !important;
     }
     
-    /* تصميم الأزرار العلوية */
     .stButton > button {
         border-radius: 20px !important;
         border: 1px solid #30363d !important;
@@ -102,7 +110,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. إعداد المفاتيح والنماذج (بقيت كما هي)
+# 3. المفاتيح والنماذج
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
     st.error("⚠️ يرجى إضافة HF_TOKEN.")
@@ -136,7 +144,7 @@ def extract_pdf_text(uploaded_file):
         return "".join([page.extract_text() or "" for page in reader.pages])[:4000]
     except Exception: return ""
 
-# 4. واجهة التطبيق
+# 4. الواجهة
 st.markdown("<h2 style='text-align: center; color: #ffffff;'>💎 أنس AI Ultra</h2>", unsafe_allow_html=True)
 
 col1, col2 = st.columns([1, 1])
@@ -161,7 +169,6 @@ SUPER_SYSTEM_PROMPT = """أنت مساعد ذكاء اصطناعي خارق، ت
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض المحادثات
 for msg in st.session_state.messages:
     avatar = "👤" if msg["role"] == "user" else "💎"
     with st.chat_message(msg["role"], avatar=avatar):
@@ -170,7 +177,6 @@ for msg in st.session_state.messages:
         else:
             st.markdown(msg["content"])
 
-# إدخال المستخدم
 placeholder_text = "اسألني، ابحث في الإنترنت، أو أطلب كود..." if mode == "💬 محادثة وبحث" else "اكتب وصف الصورة..."
 
 if user_prompt := st.chat_input(placeholder_text):
