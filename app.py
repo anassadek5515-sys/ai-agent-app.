@@ -132,6 +132,19 @@ def create_new_session():
     db_conn.commit()
     st.session_state.current_session_id = c.lastrowid
 
+def delete_session(session_id):
+    c = db_conn.cursor()
+    c.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+    c.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+    db_conn.commit()
+    # اختيار محادثة أخرى إذا توفرت
+    c.execute("SELECT id FROM sessions ORDER BY id DESC LIMIT 1")
+    row = c.fetchone()
+    if row:
+        st.session_state.current_session_id = row[0]
+    else:
+        create_new_session()
+
 def get_all_sessions():
     c = db_conn.cursor()
     c.execute("SELECT id, title FROM sessions ORDER BY id DESC")
@@ -152,7 +165,6 @@ with st.sidebar:
     st.markdown("### 👤 الملف الشخصي والذاكرة")
     st.info("📧 متصل بـ: Anas (Google Account)")
     
-    # عرض الذاكرة طويلة المدى للمستخدم
     memories = get_user_memories()
     if memories:
         with st.expander("🧠 ماذا أعرف عنك؟ (الذاكرة)"):
@@ -178,10 +190,16 @@ with st.sidebar:
         sessions = get_all_sessions()
         
     for s_id, s_title in sessions:
-        btn_type = "secondary" if s_id != st.session_state.current_session_id else "primary"
-        if st.button(f"📁 {s_title}", key=f"session_{s_id}", use_container_width=True, type=btn_type):
-            st.session_state.current_session_id = s_id
-            st.rerun()
+        col1, col2 = st.columns([0.8, 0.2])
+        with col1:
+            btn_type = "secondary" if s_id != st.session_state.current_session_id else "primary"
+            if st.button(f"📁 {s_title}", key=f"session_{s_id}", use_container_width=True, type=btn_type):
+                st.session_state.current_session_id = s_id
+                st.rerun()
+        with col2:
+            if st.button("🗑️", key=f"del_{s_id}", help="حذف المحادثة"):
+                delete_session(s_id)
+                st.rerun()
 
     st.markdown("---")
     st.markdown("### ⚙️ إعدادات النظام")
@@ -198,7 +216,7 @@ with st.sidebar:
     IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell"
     VISION_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
-    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v9.0<br>Connected 24/7</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size: 12px; color: #8b949e;'>Anas AI Ultra v10.0<br>Connected 24/7</p>", unsafe_allow_html=True)
 
 HF_TOKEN = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 if not HF_TOKEN:
@@ -251,7 +269,6 @@ elif mode == "👁️ تحليل الصور والملفات":
             pdf_context = f"\n\n--- [محتوى الملف المرفوع] ---\n{code_text[:4000]}"
             st.success("تم قراءة الملف البرمجي بنجاح!")
 
-# دمج الذكريات طويلة المدى داخل نظام التوجيه (System Prompt)
 user_memories_list = get_user_memories()
 memory_section = ""
 if user_memories_list:
